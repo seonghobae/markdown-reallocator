@@ -1,0 +1,52 @@
+{
+  "chunks": [
+    {
+      "chunk_id": "chunk_0",
+      "content": "Python is a high-level programming language.",
+      "embedding": [0.1, 0.2, 0.3, 0.4, 0.5],
+      "metadata": {
+        "h1": "Introduction",
+        "original_position": 0
+      }
+    },
+    {
+      "chunk_id": "chunk_1",
+      "content": "Python supports multiple programming paradigms.",
+      "embedding": [0.15, 0.25, 0.35, 0.45, 0.55],
+      "metadata": {
+        "h1": "Introduction",
+        "original_position": 1
+      }
+    },
+    {
+      "chunk_id": "chunk_2",
+      "content": "Data structures in Python include lists, tuples, and dictionaries.",
+      "embedding": [0.2, 0.3, 0.4, 0.5, 0.6],
+      "metadata": {
+        "h1": "Data Structures",
+        "original_position": 2
+      }
+    },
+    {
+      "chunk_id": "chunk_3",
+      "content": "Functions are defined using the def keyword.",
+      "embedding": [0.3, 0.4, 0.5, 0.6, 0.7],
+      "metadata": {
+        "h1": "Functions",
+        "original_position": 3
+      }
+    },
+    {
+      "chunk_id": "chunk_4",
+      "content": "Python uses try-except blocks for error handling.",
+      "embedding": [0.4, 0.5, 0.6, 0.7, 0.8],
+      "metadata": {
+        "h1": "Error Handling",
+        "original_position": 4
+      }
+    }
+  ],
+  "model": "mock-embedder",
+  "dimension": 5,
+  "note": "These are mock embeddings for testing purposes. Real embeddings would have higher dimensions (e.g., 768 or 384)."
+}
