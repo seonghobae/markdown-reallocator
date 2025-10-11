@@ -238,13 +238,15 @@ class TestSearchFunctionality:
     def test_search_scores_in_valid_range(
         self, embedded_chunks: list[Chunk], mock_embedder: Embedder
     ) -> None:
-        """Similarity scores should be in [-1, 1] range."""
+        """Similarity scores should be in [-1, 1] range (with small tolerance)."""
         search = SearchModule(embedder=mock_embedder, min_similarity=0.0)
 
         results = search.search("test query", embedded_chunks)
 
+        # Allow small epsilon for floating-point precision
+        epsilon = 1e-6
         for _, score in results:
-            assert -1.0 <= score <= 1.0
+            assert -1.0 - epsilon <= score <= 1.0 + epsilon
 
     def test_search_no_results_below_threshold(
         self, embedded_chunks: list[Chunk], mock_embedder: Embedder
