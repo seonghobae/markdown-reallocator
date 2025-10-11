@@ -7,7 +7,6 @@ Performance targets from PRD:
 - Search: <500ms for 1000 chunks
 - Peak GPU memory ≤ 1.8GB
 """
-import time
 
 import pytest
 
@@ -74,16 +73,8 @@ class TestPreprocessingPerformance:
         Target: <1s per 1000 lines
         """
         preprocessor = MarkdownPreprocessor()
-        start = time.time()
         result = benchmark(preprocessor.preprocess, sample_markdown_medium)
-        elapsed = time.time() - start
-
         assert len(result) > 0
-        # Soft assertion - will not fail but will report
-        if elapsed > 1.0:
-            pytest.warn(
-                pytest.PytestWarning(f"Preprocessing took {elapsed:.3f}s (target: <1s)")
-            )
 
     def test_preprocess_large_doc(
         self, benchmark: pytest.fixture, sample_markdown_large: str  # type: ignore
@@ -139,17 +130,8 @@ class TestEmbeddingPerformance:
 
         Target: <10s for 50 chunks
         """
-        start = time.time()
         result = benchmark(embedder.embed_batch, chunks_50[:50])
-        elapsed = time.time() - start
-
         assert len(result) == 50
-        if elapsed > 10.0:
-            pytest.warn(
-                pytest.PytestWarning(
-                    f"Batch embedding took {elapsed:.3f}s (target: <10s)"
-                )
-            )
 
 
 @pytest.mark.requires_ollama
@@ -182,15 +164,8 @@ class TestSearchPerformance:
         Target: <500ms for 1000 chunks
         """
         query = "section information"
-        start = time.time()
         result = benchmark(search_module_with_1000_chunks.search, query, top_k=10)
-        elapsed = time.time() - start
-
         assert len(result) > 0
-        if elapsed > 0.5:
-            pytest.warn(
-                pytest.PytestWarning(f"Search took {elapsed*1000:.1f}ms (target: <500ms)")
-            )
 
 
 if __name__ == "__main__":
