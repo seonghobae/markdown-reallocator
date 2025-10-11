@@ -5,7 +5,6 @@ command structure and rich for terminal UI.
 """
 
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -33,7 +32,7 @@ def version_callback(value: bool) -> None:
 
 @app.callback()
 def main(
-    version: Optional[bool] = typer.Option(
+    version: bool | None = typer.Option(
         None,
         "--version",
         "-v",
@@ -86,7 +85,7 @@ def preprocess(
         readable=True,
         help="Input markdown file",
     ),
-    output: Optional[Path] = typer.Option(
+    output: Path | None = typer.Option(
         None,
         "--output",
         "-o",
@@ -105,6 +104,7 @@ def preprocess(
     """
     try:
         import time
+
         from markdown_reallocator.core.preprocessor import MarkdownPreprocessor
         from markdown_reallocator.utils.profiling import get_monitor
 

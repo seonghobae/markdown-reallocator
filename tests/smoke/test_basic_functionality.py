@@ -4,7 +4,6 @@ These tests verify core functionality works without external dependencies.
 """
 
 import numpy as np
-import pytest
 
 from markdown_reallocator.core.preprocessor import MarkdownPreprocessor, PreprocessorConfig
 from markdown_reallocator.core.splitter import MarkdownSplitter

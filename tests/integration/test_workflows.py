@@ -4,8 +4,7 @@ These tests verify that modules work together correctly.
 """
 
 import json
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pytest

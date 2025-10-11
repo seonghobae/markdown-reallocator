@@ -4,7 +4,6 @@ These tests verify that all modules can be imported without errors.
 They should run quickly (<1 second) and catch basic import issues.
 """
 
-import pytest
 
 
 def test_import_core_modules():
