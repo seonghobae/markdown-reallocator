@@ -1,0 +1,134 @@
+# Default configuration for Markdown Reallocator
+#
+# This file contains all available configuration options with their default values.
+# Copy this file to customize settings:
+#   - ./markdown_reallocator.yaml (current directory)
+#   - ~/.config/markdown_reallocator/config.yaml (user config)
+#
+# Environment variables can override any setting:
+#   MARKDOWN_REALLOCATOR_EMBEDDER_MODEL_NAME=embeddinggemma
+#   MARKDOWN_REALLOCATOR_SEARCH_TOP_K=10
+
+# ============================================================================
+# Preprocessor Settings
+# ============================================================================
+# Controls how markdown structure is normalized and bold text is converted to headings.
+
+preprocessor:
+  # Maximum length for bold text to be considered a title (characters)
+  max_title_length: 80
+
+  # Require empty lines before/after bold text for title detection
+  require_empty_lines: true
+
+  # Minimum ratio of uppercase letters for title detection (0.0-1.0)
+  # Lower values are more permissive
+  min_capitalization_ratio: 0.1
+
+  # Detect title case patterns (e.g., "This Is A Title")
+  detect_title_case: true
+
+  # Skip processing inside code blocks (```)
+  preserve_code_blocks: true
+
+  # Skip processing inside lists (-, *, 1.)
+  preserve_lists: true
+
+  # Skip processing inside tables (|)
+  preserve_tables: true
+
+  # Log warnings for ambiguous title detections
+  log_ambiguous_cases: true
+
+# ============================================================================
+# Splitter Settings
+# ============================================================================
+# Controls how markdown documents are split into semantic chunks.
+
+splitter:
+  # Header levels to split on: list of [marker, name] pairs
+  # Default splits on H1 (#), H2 (##), and H3 (###)
+  headers_to_split_on:
+    - ["#", "h1"]
+    - ["##", "h2"]
+    - ["###", "h3"]
+
+  # Maximum estimated tokens per chunk
+  # Chunks exceeding this will trigger a warning
+  max_tokens_per_chunk: 1000
+
+# ============================================================================
+# Embedder Settings
+# ============================================================================
+# Controls embedding generation using Ollama models.
+
+embedder:
+  # Ollama embedding model name (must be installed in Ollama)
+  # Popular options: embeddinggemma, nomic-embed-text, mxbai-embed-large
+  model_name: "embeddinggemma"
+
+  # Enable embedding cache for faster repeated processing
+  cache_enabled: true
+
+  # Maximum number of embeddings to cache
+  cache_max_size: 1000
+
+  # Number of chunks to process in each batch
+  batch_size: 10
+
+  # Maximum GPU memory usage threshold (MB)
+  # System will warn if available memory is below this
+  memory_threshold_mb: 1500.0
+
+# ============================================================================
+# Reorder Settings
+# ============================================================================
+# Controls how chunks are reordered by semantic similarity.
+
+reorder:
+  # Reordering strategy:
+  #   - "sequential": Chain chunks by highest similarity (smooth flow)
+  #   - "cluster": Group similar chunks into topics
+  strategy: "sequential"
+
+  # Minimum similarity threshold for considering chunks related (0.0-1.0)
+  similarity_threshold: 0.5
+
+# ============================================================================
+# Search Settings
+# ============================================================================
+# Controls semantic search over document chunks.
+
+search:
+  # Default number of search results to return
+  top_k: 5
+
+  # Minimum similarity score to include in results (0.0-1.0)
+  min_similarity: 0.5
+
+  # Default output format: "text" or "json"
+  output_format: "text"
+
+# ============================================================================
+# Deduplication Settings
+# ============================================================================
+# Controls duplicate and near-duplicate chunk detection and removal.
+
+dedup:
+  # Similarity threshold for considering chunks duplicates (0.0-1.0)
+  # Higher values (e.g., 0.95) are more strict (exact duplicates only)
+  # Lower values (e.g., 0.80) are more permissive (near-duplicates)
+  similarity_threshold: 0.85
+
+  # Strategy for selecting which chunk to keep from duplicates:
+  #   - "first": Keep chunk with earliest original position
+  #   - "longest": Keep chunk with most content
+  #   - "best_metadata": Keep chunk with most complete heading metadata
+  selection_strategy: "first"
+
+  # Use LLM (Gemma 2B) for intelligent duplicate verification
+  # Requires more memory but provides better precision
+  use_llm: false
+
+  # Dry run mode: report duplicates without removing them
+  dry_run: false

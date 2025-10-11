@@ -1,0 +1,202 @@
+site_name: Markdown Reallocator
+site_description: Local-first markdown processing toolkit with semantic operations using embeddings
+site_author: Markdown Reallocator Contributors
+site_url: https://markdown-reallocator.readthedocs.io
+
+repo_name: markdown-reallocator
+repo_url: https://github.com/yourusername/markdown-reallocator
+edit_uri: edit/main/docs/
+
+copyright: Copyright &copy; 2025 Markdown Reallocator Contributors
+
+theme:
+  name: material
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+
+plugins:
+  - search:
+      lang: en
+      separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
+  - section-index
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: google
+            docstring_section_style: table
+            show_source: true
+            show_root_heading: true
+            show_root_toc_entry: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            separate_signature: true
+            merge_init_into_class: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            filters:
+              - "!^_"  # Exclude private members
+
+markdown_extensions:
+  # Python Markdown
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+  # Python Markdown Extensions
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+      - Configuration: getting-started/configuration.md
+  - User Guide:
+      - user-guide/index.md
+      - Preprocessing: user-guide/preprocessing.md
+      - Splitting: user-guide/splitting.md
+      - Embeddings: user-guide/embeddings.md
+      - Search: user-guide/search.md
+      - Reordering: user-guide/reordering.md
+      - Deduplication: user-guide/deduplication.md
+      - Python API: user-guide/python-api.md
+      - CLI Reference: user-guide/cli-reference.md
+  - Examples:
+      - examples/index.md
+      - Basic Workflow: examples/basic-workflow.md
+      - Batch Processing: examples/batch-processing.md
+      - Custom Pipelines: examples/custom-pipelines.md
+      - Integration: examples/integration.md
+  - API Reference:
+      - api/index.md
+      - Core:
+          - Preprocessor: api/core/preprocessor.md
+          - Splitter: api/core/splitter.md
+          - Embedder: api/core/embedder.md
+      - Modules:
+          - Search: api/modules/search.md
+          - Reorder: api/modules/reorder.md
+          - Deduplication: api/modules/dedup.md
+      - Models:
+          - Chunk: api/models/chunk.md
+          - Embedding: api/models/embedding.md
+      - Utils:
+          - Cache: api/utils/cache.md
+          - Memory: api/utils/memory.md
+          - Similarity: api/utils/similarity.md
+  - Architecture:
+      - architecture/index.md
+      - Design Principles: architecture/design-principles.md
+      - Data Flow: architecture/data-flow.md
+      - Performance: architecture/performance.md
+  - Development:
+      - Contributing: development/contributing.md
+      - Testing: development/testing.md
+      - Release Process: development/release-process.md
+      - Deployment: development/deployment.md
+  - Troubleshooting: troubleshooting.md
+
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/yourusername/markdown-reallocator
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/markdown-reallocator/
+  analytics:
+    feedback:
+      title: Was this page helpful?
+      ratings:
+        - icon: material/emoticon-happy-outline
+          name: This page was helpful
+          data: 1
+          note: >-
+            Thanks for your feedback!
+        - icon: material/emoticon-sad-outline
+          name: This page could be improved
+          data: 0
+          note: >-
+            Thanks for your feedback! Help us improve by
+            <a href="https://github.com/yourusername/markdown-reallocator/issues" target="_blank" rel="noopener">opening an issue</a>.
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/extra.js

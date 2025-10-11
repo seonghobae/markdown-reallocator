@@ -1,0 +1,222 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "markdown-reallocator"
+version = "0.1.0"
+description = "Local-first markdown processing toolkit with semantic operations using embeddings"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Markdown Reallocator Contributors"}
+]
+keywords = [
+    "markdown",
+    "llm",
+    "embedding",
+    "semantic-search",
+    "document-processing",
+    "rag"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: Markup",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "langchain-text-splitters>=0.2.0",
+    "numpy>=1.24.0,<2.0.0",  # NumPy 1.x for better compatibility
+    "scikit-learn>=1.3.0",
+    "ollama>=0.1.0",
+    "typer[all]>=0.9.0",
+    "rich>=13.0.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-benchmark>=4.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.7.0",
+    "types-PyYAML",
+    "py-spy>=0.3.14",
+    "memory-profiler>=0.61.0",
+    "psutil>=5.9.0",
+    "pre-commit>=3.5.0",
+]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.5.0",
+    "mkdocstrings[python]>=0.24.0",
+    "mkdocs-section-index>=0.3.0",
+]
+optimization = [
+    "numba>=0.58.0",
+]
+
+[project.scripts]
+markdown-reallocator = "markdown_reallocator.cli.main:app"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/markdown-reallocator"
+Documentation = "https://markdown-reallocator.readthedocs.io"
+Repository = "https://github.com/yourusername/markdown-reallocator"
+Issues = "https://github.com/yourusername/markdown-reallocator/issues"
+
+[tool.setuptools]
+packages = ["markdown_reallocator"]
+
+[tool.setuptools.package-data]
+markdown_reallocator = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--cov=markdown_reallocator",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=json",
+    "--cov-report=xml",
+    "--cov-fail-under=85",
+    "--strict-markers",
+    "--tb=short",
+    "--junit-xml=reports/junit.xml",
+    "-ra",
+    "-v"
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "smoke: marks tests as smoke tests for quick validation (<10s)",
+    "unit: marks tests as unit tests (fast, isolated)",
+    "requires_ollama: marks tests that require Ollama server",
+    "requires_gpu: marks tests that require GPU",
+]
+# Minimum Python version
+minversion = "7.4"
+# Configure test discovery
+norecursedirs = [
+    ".*",
+    "build",
+    "dist",
+    "CVS",
+    "_darcs",
+    "{arch}",
+    "*.egg",
+    "venv",
+    "env",
+]
+# Console output
+console_output_style = "progress"
+# Asyncio mode for async tests
+asyncio_mode = "auto"
+# Cache directory
+cache_dir = ".pytest_cache"
+# Timeout for tests (in seconds)
+timeout = 300
+# Fail on first error (useful for CI)
+# To enable: pytest -x or pytest --exitfirst
+
+[tool.coverage.run]
+source = ["markdown_reallocator"]
+branch = true
+parallel = true
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__main__.py",
+    "*/setup.py",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+skip_empty = false
+sort = "Cover"
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "def __str__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "if typing.TYPE_CHECKING:",
+    "@abstractmethod",
+    "@abc.abstractmethod",
+    "pass",
+    "\\.\\.\\.",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+show_contexts = true
+
+[tool.coverage.json]
+output = "coverage.json"
+pretty_print = true
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]  # unused imports in __init__.py
+"tests/*" = ["B011"]  # assert False
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "ollama.*",
+    "langchain_text_splitters.*",
+    "sklearn.*",
+    "numba.*",
+    "psutil.*",
+]
+ignore_missing_imports = true
