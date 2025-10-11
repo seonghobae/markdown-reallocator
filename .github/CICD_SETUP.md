@@ -73,7 +73,7 @@ For documentation deployment:
 3. Branch: `gh-pages` / `/ (root)`
 4. Click "Save"
 
-The documentation will be available at: `https://yourusername.github.io/markdown-reallocator/`
+The documentation will be available at: `https://seonghobae.github.io/markdown-reallocator/`
 
 ### 6. Install Pre-commit Hooks (Local Development)
 
@@ -148,12 +148,10 @@ Dependabot automatically creates PRs for dependency updates.
 Status badges in README.md:
 
 ```markdown
-[![CI](https://github.com/yourusername/markdown-reallocator/workflows/CI/badge.svg)](...)
-[![codecov](https://codecov.io/gh/yourusername/markdown-reallocator/branch/main/graph/badge.svg)](...)
+[![CI](https://github.com/seonghobae/markdown-reallocator/workflows/CI/badge.svg)](...)
+[![codecov](https://codecov.io/gh/seonghobae/markdown-reallocator/branch/main/graph/badge.svg)](...)
 [![PyPI version](https://badge.fury.io/py/markdown-reallocator.svg)](...)
 ```
-
-Replace `yourusername` with your actual GitHub username.
 
 ## Pre-commit Hooks
 

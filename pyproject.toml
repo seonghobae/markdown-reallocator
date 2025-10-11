@@ -69,10 +69,10 @@ optimization = [
 markdown-reallocator = "markdown_reallocator.cli.main:app"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/markdown-reallocator"
+Homepage = "https://github.com/seonghobae/markdown-reallocator"
 Documentation = "https://markdown-reallocator.readthedocs.io"
-Repository = "https://github.com/yourusername/markdown-reallocator"
-Issues = "https://github.com/yourusername/markdown-reallocator/issues"
+Repository = "https://github.com/seonghobae/markdown-reallocator"
+Issues = "https://github.com/seonghobae/markdown-reallocator/issues"
 
 [tool.setuptools]
 packages = ["markdown_reallocator"]

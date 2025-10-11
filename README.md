@@ -1,7 +1,7 @@
 # Markdown Reallocator
 
-[![CI](https://github.com/yourusername/markdown-reallocator/workflows/CI/badge.svg)](https://github.com/yourusername/markdown-reallocator/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/yourusername/markdown-reallocator/branch/main/graph/badge.svg)](https://codecov.io/gh/yourusername/markdown-reallocator)
+[![CI](https://github.com/seonghobae/markdown-reallocator/workflows/CI/badge.svg)](https://github.com/seonghobae/markdown-reallocator/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/seonghobae/markdown-reallocator/branch/main/graph/badge.svg)](https://codecov.io/gh/seonghobae/markdown-reallocator)
 [![PyPI version](https://badge.fury.io/py/markdown-reallocator.svg)](https://badge.fury.io/py/markdown-reallocator)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -67,7 +67,7 @@ pip install markdown-reallocator
 Or install from source:
 
 ```bash
-git clone https://github.com/yourusername/markdown-reallocator.git
+git clone https://github.com/seonghobae/markdown-reallocator.git
 cd markdown-reallocator
 pip install -e .
 ```
@@ -137,7 +137,7 @@ results = processor.search("find related content", top_k=5)
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/markdown-reallocator.git
+git clone https://github.com/seonghobae/markdown-reallocator.git
 cd markdown-reallocator
 
 # Install with dev dependencies
@@ -261,6 +261,6 @@ If you use Markdown Reallocator in your research or project, please cite:
   title = {Markdown Reallocator: Local-First Markdown Processing with Semantic Operations},
   author = {Markdown Reallocator Contributors},
   year = {2025},
-  url = {https://github.com/yourusername/markdown-reallocator}
+  url = {https://github.com/seonghobae/markdown-reallocator}
 }
 ```
