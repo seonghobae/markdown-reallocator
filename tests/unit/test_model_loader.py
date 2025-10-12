@@ -197,6 +197,41 @@ class TestLoadEmbeddingModel:
         client = load_embedding_model("embeddinggemma")
         assert client is not None
 
+    @patch("markdown_reallocator.utils.model_loader.ollama.Client")
+    @patch("markdown_reallocator.utils.model_loader.ollama.list")
+    def test_pydantic_response(self, mock_list, mock_client_class) -> None:
+        """Should handle Pydantic object responses from ollama.list()."""
+        # Create mock Pydantic response
+        mock_model = Mock()
+        mock_model.model = "embeddinggemma:latest"
+
+        mock_response = Mock()
+        mock_response.models = [mock_model]
+        mock_list.return_value = mock_response
+
+        mock_client = Mock()
+        mock_client.embeddings.return_value = {"embedding": [0.1, 0.2, 0.3]}
+        mock_client_class.return_value = mock_client
+
+        client = load_embedding_model("embeddinggemma")
+        assert client is not None
+
+    @patch("markdown_reallocator.utils.model_loader.ollama.Client")
+    @patch("markdown_reallocator.utils.model_loader.ollama.list")
+    def test_unknown_model_type(self, mock_list, mock_client_class) -> None:
+        """Should handle unknown model types by converting to string."""
+        # Create mock response with unknown type
+        mock_response = Mock()
+        mock_response.models = ["embeddinggemma:latest"]  # String instead of dict/Model
+        mock_list.return_value = mock_response
+
+        mock_client = Mock()
+        mock_client.embeddings.return_value = {"embedding": [0.1, 0.2, 0.3]}
+        mock_client_class.return_value = mock_client
+
+        client = load_embedding_model("embeddinggemma")
+        assert client is not None
+
     def test_invalid_retry_count(self) -> None:
         """Should raise ValueError for invalid retry_count."""
         with pytest.raises(ValueError, match="retry_count must be at least 1"):
@@ -313,6 +348,41 @@ class TestLoadLLMModel:
         client = load_llm_model("gemma:2b-instruct-q4_0")
         assert client is not None
 
+    @patch("markdown_reallocator.utils.model_loader.ollama.Client")
+    @patch("markdown_reallocator.utils.model_loader.ollama.list")
+    def test_pydantic_response(self, mock_list, mock_client_class) -> None:
+        """Should handle Pydantic object responses from ollama.list()."""
+        # Create mock Pydantic response
+        mock_model = Mock()
+        mock_model.model = "gemma:2b-instruct-q4_0"
+
+        mock_response = Mock()
+        mock_response.models = [mock_model]
+        mock_list.return_value = mock_response
+
+        mock_client = Mock()
+        mock_client.generate.return_value = {"response": "test"}
+        mock_client_class.return_value = mock_client
+
+        client = load_llm_model("gemma:2b-instruct-q4_0")
+        assert client is not None
+
+    @patch("markdown_reallocator.utils.model_loader.ollama.Client")
+    @patch("markdown_reallocator.utils.model_loader.ollama.list")
+    def test_unknown_model_type(self, mock_list, mock_client_class) -> None:
+        """Should handle unknown model types by converting to string."""
+        # Create mock response with unknown type
+        mock_response = Mock()
+        mock_response.models = ["gemma:2b-instruct-q4_0"]  # String instead of dict/Model
+        mock_list.return_value = mock_response
+
+        mock_client = Mock()
+        mock_client.generate.return_value = {"response": "test"}
+        mock_client_class.return_value = mock_client
+
+        client = load_llm_model("gemma:2b-instruct-q4_0")
+        assert client is not None
+
     @patch("markdown_reallocator.utils.model_loader.time.sleep")
     @patch("markdown_reallocator.utils.model_loader.ollama.Client")
     @patch("markdown_reallocator.utils.model_loader.ollama.list")
@@ -407,6 +477,56 @@ class TestGetAvailableModels:
                 match="Failed to list models"
             ):
                 get_available_models()
+
+    @patch("markdown_reallocator.utils.model_loader.ollama.list")
+    @patch("markdown_reallocator.utils.model_loader.check_ollama_available")
+    def test_pydantic_response(self, mock_check, mock_list) -> None:
+        """Should handle Pydantic object responses from ollama.list()."""
+        mock_check.return_value = True
+
+        # Create mock Pydantic Model objects
+        mock_model1 = Mock()
+        mock_model1.model = "embeddinggemma:latest"
+        mock_model1.size = 1000000
+        mock_model1.modified_at = "2024-01-01T00:00:00"
+
+        mock_model2 = Mock()
+        mock_model2.model = "gemma:2b-instruct-q4_0"
+        mock_model2.size = 2000000
+        mock_model2.modified_at = "2024-01-02T00:00:00"
+
+        # Create mock ListResponse
+        mock_response = Mock()
+        mock_response.models = [mock_model1, mock_model2]
+        mock_list.return_value = mock_response
+
+        models = get_available_models()
+
+        assert len(models) == 2
+        assert models[0]["name"] == "embeddinggemma:latest"
+        assert models[0]["size"] == 1000000
+        assert models[1]["name"] == "gemma:2b-instruct-q4_0"
+
+    @patch("markdown_reallocator.utils.model_loader.ollama.list")
+    @patch("markdown_reallocator.utils.model_loader.check_ollama_available")
+    def test_pydantic_response_missing_attributes(self, mock_check, mock_list) -> None:
+        """Should handle Pydantic objects with missing optional attributes."""
+        mock_check.return_value = True
+
+        # Create mock Model without size/modified_at
+        mock_model = Mock(spec=["model"])  # Only has 'model' attribute
+        mock_model.model = "embeddinggemma:latest"
+
+        mock_response = Mock()
+        mock_response.models = [mock_model]
+        mock_list.return_value = mock_response
+
+        models = get_available_models()
+
+        assert len(models) == 1
+        assert models[0]["name"] == "embeddinggemma:latest"
+        assert models[0]["size"] == 0  # Default value
+        assert models[0]["modified_at"] == ""  # Default value
 
 
 class TestModelExists:

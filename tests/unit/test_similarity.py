@@ -412,33 +412,54 @@ class TestPerformance:
         )
 
     def test_normalized_faster_than_regular(self) -> None:
-        """Normalized version should be faster than regular version."""
+        """Normalized version should be faster than regular version on large datasets.
+
+        This is a statistical benchmark that measures average performance
+        over multiple runs to reduce noise from CPU scheduling and caching.
+        """
         np.random.seed(42)
-        # Create normalized vectors
-        vectors = np.random.randn(1000, 128)
+        # Create normalized vectors - larger dataset for meaningful benchmark
+        vectors = np.random.randn(10000, 256)  # 10x larger
         vectors = vectors / np.linalg.norm(vectors, axis=1, keepdims=True)
-        query = np.random.randn(128)
+        query = np.random.randn(256)
         query = query / np.linalg.norm(query)
 
         import time
 
-        # Regular version
-        start = time.time()
-        regular_result = batch_cosine_similarity(vectors, query)
-        regular_time = time.time() - start
+        # Warmup - prevent cold cache effects
+        _ = batch_cosine_similarity(vectors, query)
+        _ = batch_cosine_similarity_normalized(vectors, query)
 
-        # Normalized version (faster)
-        start = time.time()
-        normalized_result = batch_cosine_similarity_normalized(vectors, query)
-        normalized_time = time.time() - start
+        # Multiple runs for statistical reliability
+        n_runs = 10
+        regular_times = []
+        normalized_times = []
+
+        for _ in range(n_runs):
+            # Regular version
+            start = time.time()
+            regular_result = batch_cosine_similarity(vectors, query)
+            regular_times.append(time.time() - start)
+
+            # Normalized version
+            start = time.time()
+            normalized_result = batch_cosine_similarity_normalized(vectors, query)
+            normalized_times.append(time.time() - start)
 
         # Results should match (vectors are normalized)
         np.testing.assert_array_almost_equal(
             regular_result, normalized_result, decimal=10
         )
 
-        # Normalized should be faster (no norm computation)
-        assert normalized_time < regular_time, (
-            f"Normalized version not faster: "
-            f"{normalized_time:.4f}s vs {regular_time:.4f}s"
+        # Compare median times (more robust than mean)
+        median_regular = np.median(regular_times)
+        median_normalized = np.median(normalized_times)
+
+        # Normalized should be at least 20% faster (conservative threshold)
+        # On large datasets, typically 40-50% faster due to skipping norm computation
+        speedup = median_regular / median_normalized
+        assert speedup > 1.2, (
+            f"Normalized version not significantly faster: "
+            f"regular={median_regular:.4f}s, normalized={median_normalized:.4f}s, "
+            f"speedup={speedup:.2f}x (expected >1.2x)"
         )
