@@ -260,6 +260,40 @@ class TestSearchFunctionality:
         # May be empty or have very high similarity
         assert isinstance(results, list)
 
+    def test_search_query_embedding_failure_raises(
+        self, embedded_chunks: list[Chunk], mock_embedder: Embedder
+    ) -> None:
+        """Should raise RuntimeError when query embedding fails."""
+        search = SearchModule(embedder=mock_embedder)
+
+        # Mock embed_chunk to return chunk with None embedding (failure case)
+        def mock_failing_embed(chunk: Chunk, force_refresh: bool = False) -> Chunk:
+            chunk.embedding = None
+            return chunk
+
+        import unittest.mock
+
+        with unittest.mock.patch.object(
+            mock_embedder, "embed_chunk", side_effect=mock_failing_embed
+        ):
+            with pytest.raises(RuntimeError, match="Failed to embed query"):
+                search.search("test query", embedded_chunks)
+
+    def test_search_empty_results_with_high_threshold(
+        self, embedded_chunks: list[Chunk], mock_embedder: Embedder
+    ) -> None:
+        """Should return empty list when no results meet very high threshold."""
+        # Set threshold to 1.0 (perfect match required)
+        search = SearchModule(embedder=mock_embedder, min_similarity=1.0)
+
+        # Use query very unlikely to perfectly match any chunk
+        results = search.search(
+            "xyzqwertyasdfzxcvbnmunmatchable query content", embedded_chunks
+        )
+
+        # Should return empty list as no chunk can have perfect 1.0 similarity
+        assert results == []
+
 
 class TestResultFormatting:
     """Tests for result formatting."""
@@ -314,6 +348,33 @@ class TestResultFormatting:
 
         # Check for metadata
         assert "H1:" in formatted or "Position:" in formatted
+
+    def test_format_text_with_h2_h3_metadata(self, mock_embedder: Embedder) -> None:
+        """Should include H2 and H3 metadata in text format."""
+        # Create chunk with H1, H2, H3 metadata
+        chunk = Chunk(
+            chunk_id="test_chunk",
+            content="Test content with hierarchical headers",
+            metadata=ChunkMetadata(
+                h1="Chapter 1",
+                h2="Section 1.1",
+                h3="Subsection 1.1.1",
+                original_position=0,
+            ),
+        )
+        chunk = mock_embedder.embed_chunk(chunk)
+
+        search = SearchModule(embedder=mock_embedder)
+        results = [(chunk, 0.95)]
+
+        # Format with context
+        formatted = search.format_results(results, include_context=True)
+
+        # Check all heading levels are present
+        assert "H1: Chapter 1" in formatted
+        assert "H2: Section 1.1" in formatted
+        assert "H3: Subsection 1.1.1" in formatted
+        assert "Position: 0" in formatted
 
     def test_format_json_with_context(
         self, embedded_chunks: list[Chunk], mock_embedder: Embedder
