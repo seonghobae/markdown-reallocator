@@ -4,7 +4,12 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-import psutil
+try:
+    import psutil
+
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
 
 
 class PerformanceMonitor:
@@ -14,7 +19,7 @@ class PerformanceMonitor:
         """Initialize performance monitor."""
         self.enabled = False
         self.metrics: dict[str, dict[str, float]] = {}
-        self.process = psutil.Process()
+        self.process = psutil.Process() if PSUTIL_AVAILABLE else None
 
     def enable(self) -> None:
         """Enable performance monitoring."""
@@ -22,6 +27,8 @@ class PerformanceMonitor:
 
     def get_memory_mb(self) -> float:
         """Get current process memory usage in MB."""
+        if not PSUTIL_AVAILABLE or self.process is None:
+            return 0.0
         return self.process.memory_info().rss / 1024 / 1024
 
     def record_metric(
