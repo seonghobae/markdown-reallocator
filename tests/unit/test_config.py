@@ -162,6 +162,14 @@ class TestSearchSettings:
         with pytest.raises(ValueError, match="output_format must be"):
             SearchSettings(output_format="xml")
 
+    def test_invalid_min_similarity(self):
+        """Test validation rejects out-of-range min_similarity."""
+        with pytest.raises(ValueError, match="min_similarity must be in"):
+            SearchSettings(min_similarity=1.5)
+
+        with pytest.raises(ValueError, match="min_similarity must be in"):
+            SearchSettings(min_similarity=-0.1)
+
 
 class TestDedupSettings:
     """Tests for DedupSettings validation."""
@@ -218,6 +226,11 @@ class TestSettings:
         # Verify nested structure
         assert config_dict["preprocessor"]["max_title_length"] == 80
         assert config_dict["embedder"]["model_name"] == "embeddinggemma"
+
+        # Verify tuples are converted to lists for YAML/JSON compatibility
+        headers = config_dict["splitter"]["headers_to_split_on"]
+        assert all(isinstance(h, list) for h in headers)
+        assert headers == [["#", "h1"], ["##", "h2"], ["###", "h3"]]
 
     def test_from_dict(self):
         """Test Settings can be created from dict."""
@@ -391,6 +404,55 @@ splitter:
 
         # Lists from JSON are converted to tuples in __post_init__
         assert settings.splitter.headers_to_split_on == [("#", "h1"), ("##", "h2")]
+
+    def test_env_var_invalid_format_warning(self, tmp_path):
+        """Test warning when env var has invalid format (no underscore separator)."""
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text("preprocessor:\n  max_title_length: 80\n")
+
+        # Env var without section_key format
+        env_vars = {"MARKDOWN_REALLOCATOR_INVALID": "value"}
+
+        with patch.dict(os.environ, env_vars):
+            settings = load_config(config_path)
+
+        # Should still load successfully with warning
+        assert settings.preprocessor.max_title_length == 80
+
+    def test_env_var_unknown_section_warning(self, tmp_path):
+        """Test warning when env var references unknown config section."""
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text("preprocessor:\n  max_title_length: 80\n")
+
+        # Env var with unknown section
+        env_vars = {"MARKDOWN_REALLOCATOR_UNKNOWN_KEY": "value"}
+
+        with patch.dict(os.environ, env_vars):
+            settings = load_config(config_path)
+
+        # Should still load successfully with warning
+        assert settings.preprocessor.max_title_length == 80
+
+    def test_load_config_validation_error(self, tmp_path):
+        """Test load_config raises ValueError when config has invalid values."""
+        config_path = tmp_path / "bad_config.yaml"
+        config_path.write_text(
+            """
+preprocessor:
+  max_title_length: -10  # Invalid value
+"""
+        )
+
+        with pytest.raises(ValueError, match="Invalid config"):
+            load_config(config_path)
+
+    def test_load_config_non_dict_root(self, tmp_path):
+        """Test load_config raises error when config file root is not a dict."""
+        config_path = tmp_path / "list_config.yaml"
+        config_path.write_text("[1, 2, 3]")  # YAML list, not dict
+
+        with pytest.raises(ValueError, match="must contain a dictionary"):
+            load_config(config_path)
 
 
 class TestSaveConfig:
