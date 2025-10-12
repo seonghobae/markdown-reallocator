@@ -127,6 +127,13 @@ class TestCosineSimilarityNormalized:
         with pytest.raises(ValueError, match="must have same dimension"):
             cosine_similarity_normalized(v1, v2)
 
+    def test_non_1d_vectors_raise(self) -> None:
+        """Non-1D arrays should raise ValueError."""
+        v1 = np.array([[1.0, 2.0]])  # 2D array
+        v2 = np.array([1.0, 2.0])
+        with pytest.raises(ValueError, match="must be 1-dimensional"):
+            cosine_similarity_normalized(v1, v2)
+
 
 class TestBatchCosineSimilarity:
     """Tests for vectorized batch similarity computation."""
@@ -240,6 +247,14 @@ class TestBatchCosineSimilarity:
         with pytest.raises(ValueError, match="vectors must be 2-dimensional"):
             batch_cosine_similarity(vectors, query)
 
+    def test_batch_query_wrong_shape_raises(self) -> None:
+        """Query with wrong shape should raise ValueError."""
+        vectors = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        query = np.array([[1.0, 2.0, 3.0]])  # 2D, should be 1D
+
+        with pytest.raises(ValueError, match="query must be 1-dimensional"):
+            batch_cosine_similarity(vectors, query)
+
 
 class TestBatchCosineSimilarityNormalized:
     """Tests for normalized batch similarity computation."""
@@ -275,6 +290,31 @@ class TestBatchCosineSimilarityNormalized:
         dot_products = np.dot(vectors, query)
 
         np.testing.assert_array_almost_equal(similarities, dot_products, decimal=10)
+
+    def test_normalized_batch_wrong_shape_raises(self) -> None:
+        """Wrong array shapes should raise ValueError."""
+        # Test vectors wrong shape
+        vectors = np.array([1.0, 2.0, 3.0])  # 1D, should be 2D
+        query = np.array([1.0, 2.0, 3.0])
+
+        with pytest.raises(ValueError, match="vectors must be 2-dimensional"):
+            batch_cosine_similarity_normalized(vectors, query)
+
+    def test_normalized_batch_query_wrong_shape_raises(self) -> None:
+        """Query with wrong shape should raise ValueError."""
+        vectors = np.array([[1.0, 2.0], [3.0, 4.0]])
+        query = np.array([[1.0, 2.0]])  # 2D, should be 1D
+
+        with pytest.raises(ValueError, match="query must be 1-dimensional"):
+            batch_cosine_similarity_normalized(vectors, query)
+
+    def test_normalized_batch_dimension_mismatch_raises(self) -> None:
+        """Dimension mismatch should raise ValueError."""
+        vectors = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        query = np.array([1.0, 2.0])  # Different dimension
+
+        with pytest.raises(ValueError, match="Dimension mismatch"):
+            batch_cosine_similarity_normalized(vectors, query)
 
 
 class TestPairwiseCosineSimilarity:

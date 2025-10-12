@@ -595,3 +595,87 @@ class TestPerformance:
         # Should complete quickly
         assert duration < 1.0
         assert len(chunks) == 50
+
+
+class TestErrorHandling:
+    """Tests for error handling and edge cases."""
+
+    def test_langchain_returns_empty_list(self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+        """Should handle case where LangChain returns no chunks."""
+        from unittest.mock import Mock
+
+        splitter = MarkdownSplitter()
+        markdown = "# Title\n\nContent"
+
+        # Mock LangChain splitter to return empty list
+        mock_splitter = Mock()
+        mock_splitter.split_text.return_value = []
+        monkeypatch.setattr(splitter, "_splitter", mock_splitter)
+
+        # Should fallback to single chunk
+        chunks = splitter.split(markdown)
+
+        assert len(chunks) == 1
+        assert chunks[0].content == markdown
+        assert "LangChain splitter returned no chunks" in caplog.text
+
+    def test_skip_empty_chunks(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Should skip chunks with only whitespace."""
+        from unittest.mock import Mock
+        from langchain_core.documents import Document
+
+        splitter = MarkdownSplitter()
+        markdown = "# Title\n\nContent"
+
+        # Mock LangChain to return chunks with whitespace
+        mock_splitter = Mock()
+        mock_splitter.split_text.return_value = [
+            Document(page_content="# Title\n\nContent", metadata={"h1": "Title"}),
+            Document(page_content="   \n\n   ", metadata={}),  # Empty chunk
+            Document(page_content="More content", metadata={}),
+        ]
+        monkeypatch.setattr(splitter, "_splitter", mock_splitter)
+
+        chunks = splitter.split(markdown)
+
+        # Should skip the whitespace-only chunk
+        assert len(chunks) == 2
+        assert all(c.content.strip() for c in chunks)
+
+    def test_no_valid_chunks_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Should raise ValueError if all chunks are invalid."""
+        from unittest.mock import Mock
+        from langchain_core.documents import Document
+
+        splitter = MarkdownSplitter()
+        markdown = "# Title"
+
+        # Mock LangChain to return only whitespace chunks
+        mock_splitter = Mock()
+        mock_splitter.split_text.return_value = [
+            Document(page_content="   ", metadata={}),
+            Document(page_content="\n\n", metadata={}),
+        ]
+        monkeypatch.setattr(splitter, "_splitter", mock_splitter)
+
+        with pytest.raises(ValueError, match="No valid chunks created"):
+            splitter.split(markdown)
+
+    def test_split_exception_logged(self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+        """Should log error and re-raise on exception."""
+        from unittest.mock import Mock
+
+        splitter = MarkdownSplitter()
+        markdown = "# Title\n\nContent"
+
+        # Mock LangChain to raise exception
+        mock_splitter = Mock()
+        mock_splitter.split_text.side_effect = RuntimeError("Mock error")
+        monkeypatch.setattr(splitter, "_splitter", mock_splitter)
+
+        with pytest.raises(RuntimeError, match="Mock error"):
+            splitter.split(markdown)
+
+        # Should have logged the error
+        assert "Failed to split markdown" in caplog.text
+        assert "Mock error" in caplog.text
