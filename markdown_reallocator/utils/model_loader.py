@@ -88,8 +88,22 @@ def load_embedding_model(
     for attempt in range(retry_count):
         try:
             # Check if model is available
-            models = ollama.list()
-            model_names = [m["name"] for m in models.get("models", [])]
+            models_response = ollama.list()
+            # Handle both dict and Pydantic object responses
+            if hasattr(models_response, "models"):
+                model_list = models_response.models
+            else:
+                model_list = models_response.get("models", [])
+
+            # Extract model names (handle both dict and Model objects)
+            model_names = []
+            for m in model_list:
+                if hasattr(m, "model"):
+                    model_names.append(m.model)
+                elif isinstance(m, dict):
+                    model_names.append(m.get("name", m.get("model", "")))
+                else:
+                    model_names.append(str(m))
 
             # Handle model name variations (e.g., "embeddinggemma:latest")
             model_exists = any(
@@ -179,8 +193,22 @@ def load_llm_model(
     for attempt in range(retry_count):
         try:
             # Check if model is available
-            models = ollama.list()
-            model_names = [m["name"] for m in models.get("models", [])]
+            models_response = ollama.list()
+            # Handle both dict and Pydantic object responses
+            if hasattr(models_response, "models"):
+                model_list = models_response.models
+            else:
+                model_list = models_response.get("models", [])
+
+            # Extract model names (handle both dict and Model objects)
+            model_names = []
+            for m in model_list:
+                if hasattr(m, "model"):
+                    model_names.append(m.model)
+                elif isinstance(m, dict):
+                    model_names.append(m.get("name", m.get("model", "")))
+                else:
+                    model_names.append(str(m))
 
             # Handle model name variations
             model_exists = any(
@@ -242,7 +270,20 @@ def get_available_models() -> list[dict[str, Any]]:
 
     try:
         response = ollama.list()
-        return response.get("models", [])  # type: ignore[no-any-return]
+        # Handle both dict and Pydantic object responses
+        if hasattr(response, "models"):
+            model_list = response.models
+            # Convert Model objects to dicts
+            return [
+                {
+                    "name": m.model if hasattr(m, "model") else str(m),
+                    "size": m.size if hasattr(m, "size") else 0,
+                    "modified_at": str(m.modified_at) if hasattr(m, "modified_at") else "",
+                }
+                for m in model_list
+            ]
+        else:
+            return response.get("models", [])  # type: ignore[no-any-return]
     except Exception as e:
         raise OllamaConnectionError(f"Failed to list models: {e}") from e
 
@@ -260,7 +301,7 @@ def model_exists(model_name: str) -> bool:
         OllamaConnectionError: If Ollama service is not available
     """
     models = get_available_models()
-    model_names = [m["name"] for m in models]
+    model_names = [m.get("name", "") if isinstance(m, dict) else str(m) for m in models]
 
     # Handle model name variations
     return any(
