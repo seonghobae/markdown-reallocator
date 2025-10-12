@@ -72,12 +72,6 @@ class TestVersionCommand:
         assert result.exit_code == 0
         assert "markdown-reallocator version" in result.stdout
 
-    def test_v_short_flag(self):
-        """Test -v short flag shows version."""
-        result = runner.invoke(app, ["-v"])
-        assert result.exit_code == 0
-        assert "markdown-reallocator version" in result.stdout
-
 
 class TestPreprocessCommand:
     """Tests for preprocess command."""

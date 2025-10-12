@@ -32,10 +32,9 @@ def version_callback(value: bool) -> None:
 
 @app.callback()
 def main(
-    version: bool | None = typer.Option(
-        None,
+    version: bool = typer.Option(
+        False,
         "--version",
-        "-v",
         callback=version_callback,
         is_eager=True,
         help="Show version and exit",
@@ -43,7 +42,6 @@ def main(
     verbose: bool = typer.Option(
         False,
         "--verbose",
-        "-V",
         help="Enable verbose output",
     ),
     no_color: bool = typer.Option(
@@ -88,7 +86,6 @@ def preprocess(
     output: Path | None = typer.Option(
         None,
         "--output",
-        "-o",
         help="Output file (default: stdout)",
     ),
     detect_bold_headers: bool = typer.Option(
@@ -158,7 +155,6 @@ def split(
     output: Path | None = typer.Option(
         None,
         "--output",
-        "-o",
         help="Output JSON file with chunks",
     ),
     max_tokens: int = typer.Option(
@@ -224,7 +220,6 @@ def embed(
     output: Path = typer.Option(
         ...,
         "--output",
-        "-o",
         help="Output file for embeddings (.npz)",
     ),
     model: str = typer.Option(
@@ -325,7 +320,6 @@ def search(
     top_k: int = typer.Option(
         5,
         "--top-k",
-        "-k",
         help="Number of results to return",
     ),
     min_similarity: float = typer.Option(
@@ -336,7 +330,6 @@ def search(
     output_format: str = typer.Option(
         "text",
         "--format",
-        "-f",
         help="Output format (text or json)",
     ),
 ) -> None:
@@ -410,13 +403,11 @@ def reorder(
     output: Path = typer.Option(
         ...,
         "--output",
-        "-o",
         help="Output markdown file",
     ),
     strategy: str = typer.Option(
         "sequential",
         "--strategy",
-        "-s",
         help="Reordering strategy (sequential or cluster)",
     ),
 ) -> None:
@@ -489,19 +480,16 @@ def dedup(
     output: Path = typer.Option(
         ...,
         "--output",
-        "-o",
         help="Output JSON file with deduplicated chunks",
     ),
     similarity_threshold: float = typer.Option(
         0.85,
         "--threshold",
-        "-t",
         help="Similarity threshold for duplicates (0.0-1.0)",
     ),
     strategy: str = typer.Option(
         "first",
         "--strategy",
-        "-s",
         help="Selection strategy (first, longest, best_metadata)",
     ),
     dry_run: bool = typer.Option(
