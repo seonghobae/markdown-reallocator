@@ -666,3 +666,59 @@ class TestRetryBehavior:
         # Should sleep twice (3 attempts = 2 sleeps)
         assert mock_sleep.call_count == 2
         mock_sleep.assert_called_with(0.5)
+
+
+class TestBranchCoverage:
+    """Tests specifically for branch coverage."""
+
+    @patch("markdown_reallocator.utils.model_loader.time.sleep")
+    @patch("markdown_reallocator.utils.model_loader.ollama.list")
+    @patch("markdown_reallocator.utils.model_loader.check_ollama_available")
+    def test_embedding_retry_break_path(self, mock_check, mock_list, mock_sleep) -> None:
+        """Should cover branch 88->145 (break statement on last retry)."""
+        mock_check.return_value = True
+
+        # Raise generic exceptions on all retry attempts
+        # This will hit the break statement (line 142) on the last attempt
+        mock_list.side_effect = [
+            Exception("Transient error 1"),
+            Exception("Transient error 2"),
+            Exception("Transient error 3"),  # Last attempt hits break
+        ]
+
+        with pytest.raises(
+            ModelLoadError,
+            match="Failed to load model .* after 3 attempts"
+        ):
+            load_embedding_model("embeddinggemma", retry_count=3, retry_delay=0.01)
+
+        # Should attempt 3 times
+        assert mock_list.call_count == 3
+        # Should sleep twice (between attempts 1-2 and 2-3)
+        assert mock_sleep.call_count == 2
+
+    @patch("markdown_reallocator.utils.model_loader.time.sleep")
+    @patch("markdown_reallocator.utils.model_loader.ollama.list")
+    @patch("markdown_reallocator.utils.model_loader.check_ollama_available")
+    def test_llm_retry_break_path(self, mock_check, mock_list, mock_sleep) -> None:
+        """Should cover branch 193->250 (break statement on last retry for LLM)."""
+        mock_check.return_value = True
+
+        # Raise generic exceptions on all retry attempts
+        # This will hit the break statement (line 247) on the last attempt
+        mock_list.side_effect = [
+            Exception("Transient error 1"),
+            Exception("Transient error 2"),
+            Exception("Transient error 3"),  # Last attempt hits break
+        ]
+
+        with pytest.raises(
+            ModelLoadError,
+            match="Failed to load model .* after 3 attempts"
+        ):
+            load_llm_model("gemma:2b-instruct-q4_0", retry_count=3, retry_delay=0.01)
+
+        # Should attempt 3 times
+        assert mock_list.call_count == 3
+        # Should sleep twice (between attempts 1-2 and 2-3)
+        assert mock_sleep.call_count == 2

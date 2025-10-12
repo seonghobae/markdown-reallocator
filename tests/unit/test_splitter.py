@@ -679,3 +679,107 @@ class TestErrorHandling:
         # Should have logged the error
         assert "Failed to split markdown" in caplog.text
         assert "Mock error" in caplog.text
+
+
+class TestBranchCoverage:
+    """Tests specifically for branch coverage."""
+
+    def test_split_with_metadata_h2_detection(self) -> None:
+        """Should cover branch 245->247 for h2 header detection."""
+        splitter = MarkdownSplitter()
+        markdown = """# Main Title
+
+## Section One
+
+Content for section one.
+
+## Section Two
+
+Content for section two."""
+
+        chunks, metadata = splitter.split_with_metadata(markdown)
+
+        # Should detect h2 headers
+        assert "h2" in metadata["headers_used"]
+        assert "h1" in metadata["headers_used"]
+
+        # Verify chunks have h2 metadata
+        assert any(c.metadata.h2 == "Section One" for c in chunks)
+        assert any(c.metadata.h2 == "Section Two" for c in chunks)
+
+    def test_split_with_metadata_h3_detection(self) -> None:
+        """Should cover line 250 for h3 header detection."""
+        splitter = MarkdownSplitter()
+        markdown = """# Main Title
+
+## Section
+
+### Subsection One
+
+Content for subsection one.
+
+### Subsection Two
+
+Content for subsection two."""
+
+        chunks, metadata = splitter.split_with_metadata(markdown)
+
+        # Should detect h3 headers
+        assert "h3" in metadata["headers_used"]
+        assert "h2" in metadata["headers_used"]
+        assert "h1" in metadata["headers_used"]
+
+        # Verify chunks have h3 metadata
+        assert any(c.metadata.h3 == "Subsection One" for c in chunks)
+        assert any(c.metadata.h3 == "Subsection Two" for c in chunks)
+
+    def test_split_with_metadata_all_header_levels(self) -> None:
+        """Should detect all header levels (h1, h2, h3) in one document."""
+        splitter = MarkdownSplitter()
+        markdown = """# Top Level
+
+Introduction paragraph.
+
+## Second Level
+
+Some content here.
+
+### Third Level
+
+Detailed content.
+
+### Another Third Level
+
+More details.
+
+## Another Second Level
+
+Final content."""
+
+        chunks, metadata = splitter.split_with_metadata(markdown)
+
+        # All header levels should be detected
+        assert metadata["headers_used"] == ["h1", "h2", "h3"]
+        assert len(chunks) >= 3
+
+        # Verify metadata structure
+        assert metadata["total_chunks"] == len(chunks)
+        assert metadata["total_tokens"] > 0
+        assert metadata["max_chunk_tokens"] > 0
+
+    def test_split_with_metadata_no_headers(self) -> None:
+        """Should cover branch 245->247 when h1 is None (no headers)."""
+        splitter = MarkdownSplitter()
+        markdown = "Just plain text without any headers."
+
+        chunks, metadata = splitter.split_with_metadata(markdown)
+
+        # No headers should be detected
+        assert metadata["headers_used"] == []
+        assert len(chunks) == 1
+
+        # Verify all chunks have no header metadata
+        for chunk in chunks:
+            assert chunk.metadata.h1 is None
+            assert chunk.metadata.h2 is None
+            assert chunk.metadata.h3 is None

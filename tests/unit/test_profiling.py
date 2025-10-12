@@ -327,3 +327,58 @@ class TestIntegration:
         assert "step1" in output
         assert "step2" in output
         assert "Performance Summary" in output
+
+
+class TestPsutilImportError:
+    """Tests for psutil import failure handling."""
+
+    def test_profiling_module_imports_when_psutil_unavailable(self) -> None:
+        """Should handle psutil import failure gracefully (covers lines 11-12)."""
+        import importlib
+        import sys
+
+        # Save original modules
+        original_psutil = sys.modules.get("psutil")
+        original_profiling = sys.modules.get("markdown_reallocator.utils.profiling")
+
+        try:
+            # Remove both modules from cache
+            if "psutil" in sys.modules:
+                del sys.modules["psutil"]
+            if "markdown_reallocator.utils.profiling" in sys.modules:
+                del sys.modules["markdown_reallocator.utils.profiling"]
+
+            # Block psutil import by setting it to None
+            sys.modules["psutil"] = None  # type: ignore
+
+            # Now import profiling - should catch ImportError and set PSUTIL_AVAILABLE=False
+            import markdown_reallocator.utils.profiling as profiling_module
+
+            # PSUTIL_AVAILABLE should be False
+            assert profiling_module.PSUTIL_AVAILABLE is False
+
+            # PerformanceMonitor should still work without psutil
+            monitor = profiling_module.PerformanceMonitor()
+            assert monitor.process is None  # No psutil process
+            assert monitor.get_memory_mb() == 0.0  # Returns 0.0 without psutil
+
+        finally:
+            # Restore original modules
+            if original_psutil is not None:
+                sys.modules["psutil"] = original_psutil
+            else:
+                # Remove the None we added
+                if "psutil" in sys.modules:
+                    del sys.modules["psutil"]
+
+            if original_profiling is not None:
+                sys.modules["markdown_reallocator.utils.profiling"] = original_profiling
+            else:
+                if "markdown_reallocator.utils.profiling" in sys.modules:
+                    del sys.modules["markdown_reallocator.utils.profiling"]
+
+            # Re-import profiling module to restore normal state
+            if "markdown_reallocator.utils.profiling" in sys.modules:
+                importlib.reload(sys.modules["markdown_reallocator.utils.profiling"])
+            else:
+                import markdown_reallocator.utils.profiling  # noqa: F401

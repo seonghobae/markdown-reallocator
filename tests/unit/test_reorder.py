@@ -296,6 +296,29 @@ class TestClusterReordering:
         # All chunks should be present
         assert len(reordered) == 15
 
+    def test_cluster_reorder_large_document(self) -> None:
+        """Should handle large documents with >20 chunks (tests line 283)."""
+        np.random.seed(42)
+        reorder = ReorderModule(strategy="cluster")
+
+        # Create 25 chunks (>20 to trigger different cluster count logic)
+        chunks = []
+        for i in range(25):
+            chunk = Chunk(
+                chunk_id=f"chunk_{i}",
+                content=f"Content {i}",
+                metadata=ChunkMetadata(original_position=i),
+            )
+            # Create random embeddings
+            chunk.embedding = np.random.randn(10).astype(np.float32)
+            chunks.append(chunk)
+
+        reordered = reorder.reorder(chunks)
+
+        # All chunks should be present
+        assert len(reordered) == 25
+        assert {c.chunk_id for c in reordered} == {c.chunk_id for c in chunks}
+
 
 class TestMarkdownReconstruction:
     """Tests for markdown reconstruction."""
@@ -366,3 +389,20 @@ class TestMarkdownReconstruction:
         assert isinstance(markdown, str)
         for chunk in reordered:
             assert chunk.content in markdown
+
+    def test_reconstruct_single_chunk(self) -> None:
+        """Should handle reconstruction with single chunk."""
+        reorder = ReorderModule()
+
+        chunk = Chunk(
+            chunk_id="single",
+            content="Single chunk content",
+            metadata=ChunkMetadata(original_position=0),
+        )
+
+        markdown = reorder.reconstruct_markdown([chunk])
+
+        # Should reconstruct successfully
+        assert isinstance(markdown, str)
+        assert "Single chunk content" in markdown
+        assert markdown.endswith("\n")

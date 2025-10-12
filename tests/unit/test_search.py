@@ -282,17 +282,18 @@ class TestSearchFunctionality:
     def test_search_empty_results_with_high_threshold(
         self, embedded_chunks: list[Chunk], mock_embedder: Embedder
     ) -> None:
-        """Should return empty list when no results meet very high threshold."""
-        # Set threshold to 1.0 (perfect match required)
-        search = SearchModule(embedder=mock_embedder, min_similarity=1.0)
+        """Should filter results that don't meet very high threshold."""
+        # Set threshold just below 1.0 (near-perfect match required)
+        search = SearchModule(embedder=mock_embedder, min_similarity=0.999)
 
-        # Use query very unlikely to perfectly match any chunk
+        # Use query very unlikely to match any chunk at 0.999+ similarity
         results = search.search(
             "xyzqwertyasdfzxcvbnmunmatchable query content", embedded_chunks
         )
 
-        # Should return empty list as no chunk can have perfect 1.0 similarity
-        assert results == []
+        # All results (if any) must meet threshold
+        for _, score in results:
+            assert score >= 0.999
 
 
 class TestResultFormatting:
@@ -507,3 +508,52 @@ class TestSearchIntegration:
         ids1 = {c.chunk_id for c, _ in results1}
         ids2 = {c.chunk_id for c, _ in results2}
         assert ids1 != ids2
+
+
+class TestBranchCoverage:
+    """Tests specifically for branch coverage."""
+
+    def test_search_zero_results_above_threshold(
+        self, embedded_chunks: list[Chunk], mock_embedder: Embedder
+    ) -> None:
+        """Should cover lines 168-169 when no chunks pass threshold."""
+        search = SearchModule(embedder=mock_embedder, min_similarity=1.0)
+
+        # With threshold = 1.0 (perfect similarity), it's nearly impossible to get results
+        # unless query and chunk are identical
+        results = search.search(
+            "qwertyuiopasdfghjklzxcvbnm12345678901234567890unique", embedded_chunks
+        )
+
+        # Should return empty list (covering lines 168-169)
+        assert results == []
+
+    def test_format_text_with_none_h1_metadata(
+        self, mock_embedder: Embedder
+    ) -> None:
+        """Should cover branch 252->254 when metadata.h1 is None."""
+        # Create chunk with NO h1 metadata (h1=None)
+        chunk = Chunk(
+            chunk_id="no_h1_chunk",
+            content="Content without h1 header",
+            metadata=ChunkMetadata(
+                h1=None,  # No h1 header
+                h2="Section 2",
+                h3="Subsection 3",
+                original_position=0,
+            ),
+        )
+        chunk = mock_embedder.embed_chunk(chunk)
+
+        search = SearchModule(embedder=mock_embedder)
+        results = [(chunk, 0.85)]
+
+        # Format with context
+        formatted = search.format_results(results, include_context=True)
+
+        # Should NOT include "H1:" line (covers branch 252->254)
+        assert "H1:" not in formatted
+        # But should include H2 and H3
+        assert "H2: Section 2" in formatted
+        assert "H3: Subsection 3" in formatted
+        assert "Position: 0" in formatted

@@ -516,3 +516,174 @@ class TestEdgeCases:
         # Should keep only 1
         assert len(result) == 1
         assert report.removed_count == 2
+
+
+class TestBranchCoverage:
+    """Tests specifically for branch coverage."""
+
+    def test_reduction_percentage_with_zero_original_count(self) -> None:
+        """Should cover line 43 - reduction_percentage when original_count is 0."""
+        from markdown_reallocator.modules.dedup import DeduplicationReport
+
+        # Create report with 0 original count
+        report = DeduplicationReport(
+            original_count=0,
+            deduplicated_count=0,
+            removed_count=0,
+            duplicate_groups=[],
+            removed_chunk_ids=[],
+            kept_chunk_ids=[],
+        )
+
+        # Should return 0.0 without division by zero error
+        assert report.reduction_percentage == 0.0
+
+    def test_metadata_scoring_all_levels(self) -> None:
+        """Should cover branch 233->235 - metadata scoring with different h1/h2/h3."""
+        # Create chunks with varying metadata completeness
+        chunks = []
+
+        # Chunk 0: h1 only (score = 3)
+        chunks.append(
+            Chunk(
+                chunk_id="chunk_0",
+                content="Content 0",
+                metadata=ChunkMetadata(h1="Title", original_position=0),
+            )
+        )
+
+        # Chunk 1: h1 + h2 (score = 5)
+        chunks.append(
+            Chunk(
+                chunk_id="chunk_1",
+                content="Content 1",
+                metadata=ChunkMetadata(h1="Title", h2="Subtitle", original_position=1),
+            )
+        )
+
+        # Chunk 2: h1 + h2 + h3 (score = 6) - best metadata
+        chunks.append(
+            Chunk(
+                chunk_id="chunk_2",
+                content="Content 2",
+                metadata=ChunkMetadata(
+                    h1="Title", h2="Subtitle", h3="Section", original_position=2
+                ),
+            )
+        )
+
+        # Add similar embeddings so they form a duplicate group
+        embedding = np.array([0.9, 0.1, 0.0], dtype=np.float32)
+        for chunk in chunks:
+            chunk.embedding = embedding / np.linalg.norm(embedding)
+
+        dedup = DeduplicationModule(
+            similarity_threshold=0.85, selection_strategy="best_metadata"
+        )
+
+        result, report = dedup.deduplicate(chunks)
+
+        # Should keep chunk_2 (most complete metadata with all h1, h2, h3)
+        assert len(result) == 1
+        assert result[0].chunk_id == "chunk_2"
+
+    def test_format_report_no_duplicate_groups(self) -> None:
+        """Should cover branch 352->362 when duplicate_groups is empty."""
+        from markdown_reallocator.modules.dedup import DeduplicationReport
+
+        dedup = DeduplicationModule()
+
+        # Create report with no duplicate groups
+        report = DeduplicationReport(
+            original_count=5,
+            deduplicated_count=5,
+            removed_count=0,
+            duplicate_groups=[],  # Empty - no duplicates found
+            removed_chunk_ids=[],
+            kept_chunk_ids=["chunk_0", "chunk_1", "chunk_2", "chunk_3", "chunk_4"],
+        )
+
+        formatted = dedup.format_report(report)
+
+        # Should still format without duplicate groups section
+        assert "Deduplication Report" in formatted
+        assert "Original chunks: 5" in formatted
+        assert "After deduplication: 5" in formatted
+        assert "Removed: 0" in formatted
+        # Should NOT have duplicate groups section since empty
+        assert "Duplicate groups:" not in formatted
+
+    def test_format_report_no_removed_chunks(self) -> None:
+        """Should cover branch 362->369 when removed_chunk_ids is empty."""
+        from markdown_reallocator.modules.dedup import DeduplicationReport
+
+        dedup = DeduplicationModule()
+
+        # Create report with no removed chunks
+        report = DeduplicationReport(
+            original_count=3,
+            deduplicated_count=3,
+            removed_count=0,
+            duplicate_groups=[],
+            removed_chunk_ids=[],  # Empty - nothing removed
+            kept_chunk_ids=["chunk_0", "chunk_1", "chunk_2"],
+        )
+
+        formatted = dedup.format_report(report)
+
+        # Should format without removed chunks section
+        assert "Deduplication Report" in formatted
+        assert "Original chunks: 3" in formatted
+        # Should NOT have removed chunk IDs section since empty
+        assert "Removed chunk IDs" not in formatted
+
+    def test_format_report_with_long_removed_list(self) -> None:
+        """Should cover truncation branch in format_report for >10 removed chunks."""
+        from markdown_reallocator.modules.dedup import DeduplicationReport
+
+        dedup = DeduplicationModule()
+
+        # Create report with >10 removed chunks (to test truncation)
+        removed_ids = [f"chunk_{i}" for i in range(15)]
+        report = DeduplicationReport(
+            original_count=20,
+            deduplicated_count=5,
+            removed_count=15,
+            duplicate_groups=[],
+            removed_chunk_ids=removed_ids,
+            kept_chunk_ids=["kept_0", "kept_1", "kept_2", "kept_3", "kept_4"],
+        )
+
+        formatted = dedup.format_report(report)
+
+        # Should show first 10 and indicate more
+        assert "Removed chunk IDs (15):" in formatted
+        assert "chunk_0" in formatted  # First item
+        assert "chunk_9" in formatted  # 10th item
+        assert "... and 5 more" in formatted  # Truncation message
+
+    def test_format_report_with_long_duplicate_groups(self) -> None:
+        """Should cover truncation branch in format_report for groups >3 chunks."""
+        from markdown_reallocator.modules.dedup import DeduplicationReport
+
+        dedup = DeduplicationModule()
+
+        # Create a duplicate group with >3 chunks
+        large_group = [f"chunk_{i}" for i in range(5)]
+        report = DeduplicationReport(
+            original_count=10,
+            deduplicated_count=6,
+            removed_count=4,
+            duplicate_groups=[large_group],  # One group with 5 chunks
+            removed_chunk_ids=["chunk_1", "chunk_2", "chunk_3", "chunk_4"],
+            kept_chunk_ids=["chunk_0", "kept_1", "kept_2", "kept_3", "kept_4", "kept_5"],
+        )
+
+        formatted = dedup.format_report(report)
+
+        # Should show first 3 and indicate more
+        assert "Group 1: 5 chunks" in formatted
+        assert "chunk_0" in formatted  # First item
+        assert "chunk_1" in formatted  # Second item
+        assert "chunk_2" in formatted  # Third item
+        assert "... and 2 more" in formatted  # Truncation message

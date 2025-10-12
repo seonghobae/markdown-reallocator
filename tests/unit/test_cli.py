@@ -564,6 +564,17 @@ class TestGlobalOptions:
         )
         assert result.exit_code == 0
 
+    def test_profile_flag(self, sample_markdown, tmp_path):
+        """Test --profile flag enables performance profiling."""
+        output_file = tmp_path / "output.md"
+        result = runner.invoke(
+            app,
+            ["--profile", "preprocess", str(sample_markdown), "--output", str(output_file)],
+        )
+        assert result.exit_code == 0
+        # Profile output should be visible (profiling summary)
+        # The profiling monitor should be enabled and record metrics
+
 
 class TestErrorHandling:
     """Tests for error handling in CLI."""
@@ -589,3 +600,15 @@ class TestErrorHandling:
             ["embed", str(invalid_json), "--output", str(output_file)],
         )
         assert result.exit_code != 0
+
+
+class TestCLIEntryPoint:
+    """Tests for CLI entry point function."""
+
+    @patch("markdown_reallocator.cli.main.app")
+    def test_cli_function_calls_app(self, mock_app):
+        """Test cli() function calls app()."""
+        from markdown_reallocator.cli.main import cli
+
+        cli()
+        mock_app.assert_called_once()

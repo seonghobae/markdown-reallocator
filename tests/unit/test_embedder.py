@@ -596,3 +596,149 @@ class TestIntegration:
             embedder.load_embeddings(embedded, str(filepath))
 
             assert all(c.embedding is not None for c in embedded)
+
+
+class TestBranchCoverage:
+    """Tests specifically for branch coverage."""
+
+    @patch("markdown_reallocator.core.embedder.GPUMemoryMonitor")
+    @patch("markdown_reallocator.core.embedder.load_embedding_model")
+    @patch("markdown_reallocator.core.embedder.check_gpu_memory_available")
+    def test_embed_chunk_cache_disabled_path(
+        self,
+        mock_check_mem,
+        mock_load_model,
+        mock_monitor,
+        sample_chunk: Chunk,
+    ) -> None:
+        """Should cover branch 162->169 when cache is disabled."""
+        mock_check_mem.return_value = True
+
+        # Mock Ollama client
+        mock_client = Mock()
+        mock_client.embeddings.return_value = {
+            "embedding": [0.1, 0.2, 0.3, 0.4]
+        }
+        mock_load_model.return_value = mock_client
+
+        # Mock GPU monitor
+        mock_monitor.return_value.__enter__.return_value = Mock()
+        mock_monitor.return_value.__exit__.return_value = False
+
+        # Cache disabled - this should hit the branch 162->169
+        embedder = Embedder(cache_enabled=False)
+        result = embedder.embed_chunk(sample_chunk)
+
+        assert result.embedding is not None
+        assert result.embedding.shape == (4,)
+
+    def test_clear_cache_when_cache_is_none(self) -> None:
+        """Should cover branch 267->exit when cache is None."""
+        # Cache disabled - _cache is None
+        embedder = Embedder(cache_enabled=False)
+
+        # This should hit the early exit branch 267->exit
+        embedder.clear_cache()
+
+        # Should not raise, just return early
+
+    @patch("markdown_reallocator.core.embedder.load_embedding_model")
+    @patch("markdown_reallocator.core.embedder.check_gpu_memory_available")
+    def test_save_embeddings_loop_coverage(
+        self,
+        mock_check_mem,
+        mock_load_model,
+    ) -> None:
+        """Should cover branch 294->293 loop in save_embeddings."""
+        # Create chunks with varying embedding presence
+        chunks = [
+            Chunk(
+                chunk_id="chunk_1",
+                content="Content 1",
+                metadata=ChunkMetadata(original_position=0),
+            ),
+            Chunk(
+                chunk_id="chunk_2",
+                content="Content 2",
+                metadata=ChunkMetadata(original_position=1),
+            ),
+        ]
+
+        # Add embeddings to both chunks
+        chunks[0].embedding = np.array([0.1, 0.2, 0.3], dtype=np.float32)
+        chunks[1].embedding = np.array([0.4, 0.5, 0.6], dtype=np.float32)
+
+        embedder = Embedder()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filepath = Path(tmpdir) / "embeddings.npz"
+
+            # This should iterate through all chunks, covering the loop
+            embedder.save_embeddings(chunks, str(filepath))
+
+            assert filepath.exists()
+
+    @patch("markdown_reallocator.core.embedder.load_embedding_model")
+    @patch("markdown_reallocator.core.embedder.check_gpu_memory_available")
+    def test_load_embeddings_loop_coverage(
+        self,
+        mock_check_mem,
+        mock_load_model,
+    ) -> None:
+        """Should cover branch 326->325 loop in load_embeddings."""
+        # Create chunks with embeddings
+        chunks = [
+            Chunk(
+                chunk_id="chunk_1",
+                content="Content 1",
+                metadata=ChunkMetadata(original_position=0),
+            ),
+            Chunk(
+                chunk_id="chunk_2",
+                content="Content 2",
+                metadata=ChunkMetadata(original_position=1),
+            ),
+        ]
+
+        # Add embeddings
+        for chunk in chunks:
+            chunk.embedding = np.array([0.1, 0.2, 0.3], dtype=np.float32)
+
+        embedder = Embedder()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filepath = Path(tmpdir) / "embeddings.npz"
+
+            # Save embeddings
+            embedder.save_embeddings(chunks, str(filepath))
+
+            # Clear embeddings
+            for chunk in chunks:
+                chunk.embedding = None
+
+            # Load - this should iterate through all chunks, covering the loop
+            embedder.load_embeddings(chunks, str(filepath))
+
+            # Verify all chunks got embeddings
+            assert all(c.embedding is not None for c in chunks)
+
+    @patch("markdown_reallocator.core.embedder.load_embedding_model")
+    @patch("markdown_reallocator.core.embedder.check_gpu_memory_available")
+    def test_client_not_initialized_defensive_check(
+        self,
+        mock_check_mem,
+        mock_load_model,
+        sample_chunk: Chunk,
+    ) -> None:
+        """Should cover line 140 defensive check for uninitialized client."""
+        mock_check_mem.return_value = True
+
+        # Mock load_embedding_model to return None (edge case)
+        mock_load_model.return_value = None
+
+        embedder = Embedder()
+
+        # This should trigger _ensure_model_loaded which sets _client to None
+        # Then embed_chunk should hit line 140 and raise RuntimeError
+        with pytest.raises(RuntimeError, match="Ollama client not initialized"):
+            embedder.embed_chunk(sample_chunk)
