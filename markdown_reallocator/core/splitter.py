@@ -6,6 +6,7 @@ while preserving hierarchy metadata.
 
 import hashlib
 import logging
+import re
 from typing import Any
 
 from langchain_text_splitters import MarkdownHeaderTextSplitter
@@ -193,13 +194,6 @@ class MarkdownSplitter:
                     content
                 )
 
-                # Check token limit
-                if metadata.token_count > self.max_tokens_per_chunk:
-                    logger.warning(
-                        f"Chunk at position {position} exceeds max tokens "
-                        f"({metadata.token_count} > {self.max_tokens_per_chunk})"
-                    )
-
                 # Generate chunk ID
                 chunk_id = self._generate_chunk_id(content, position)
 
@@ -210,7 +204,12 @@ class MarkdownSplitter:
                     metadata=metadata,
                 )
 
-                chunks.append(chunk)
+                # Check if chunk exceeds token limit and try semantic splitting
+                if chunk.metadata.token_count > self.max_tokens_per_chunk:
+                    sub_chunks = self._split_oversized_chunk(chunk)
+                    chunks.extend(sub_chunks)
+                else:
+                    chunks.append(chunk)
 
             if not chunks:
                 raise ValueError("No valid chunks created after splitting")
@@ -272,3 +271,281 @@ class MarkdownSplitter:
         }
 
         return chunks, metadata
+
+    def _parse_list_items(self, content: str) -> list[str]:
+        """Parse content into list items, preserving indented sub-items.
+
+        Args:
+            content: Markdown content with list items
+
+        Returns:
+            List of complete list items (each may contain multiple lines)
+
+        Examples:
+            >>> splitter = MarkdownSplitter()
+            >>> content = "- Item 1\\n  - Sub A\\n- Item 2"
+            >>> items = splitter._parse_list_items(content)
+            >>> len(items)
+            2
+        """
+        lines = content.split('\n')
+        items = []
+        current_item = []
+
+        for line in lines:
+            # Check if line starts a new list item
+            # Patterns: '- ', '* ', '1. ', '2. ', etc.
+            is_list_start = (
+                re.match(r'^(\s*)[-*]\s+', line) or  # Unordered list
+                re.match(r'^(\s*)\d+\.\s+', line)     # Ordered list
+            )
+
+            if is_list_start:
+                # Save previous item if exists
+                if current_item:
+                    items.append('\n'.join(current_item))
+                # Start new item
+                current_item = [line]
+            elif current_item:
+                # Continue current item (indented or blank line)
+                current_item.append(line)
+            # else: skip lines before first list item
+
+        # Add last item
+        if current_item:
+            items.append('\n'.join(current_item))
+
+        return items
+
+    def _group_items_by_tokens(
+        self,
+        items: list[str],
+        max_tokens: int
+    ) -> list[list[str]]:
+        """Group items into chunks that fit within token limit.
+
+        Args:
+            items: List of content items (e.g., list items, paragraphs)
+            max_tokens: Maximum tokens per group
+
+        Returns:
+            List of groups, where each group is a list of items
+
+        Examples:
+            >>> splitter = MarkdownSplitter()
+            >>> items = ["Short item", "Another short", "Yet another"]
+            >>> groups = splitter._group_items_by_tokens(items, 1000)
+            >>> len(groups)
+            1
+        """
+        if not items:
+            return []
+
+        groups = []
+        current_group = []
+        current_tokens = 0
+
+        for item in items:
+            item_tokens = self.estimate_tokens(item)
+
+            # If single item exceeds limit, keep it as separate group
+            if item_tokens > max_tokens:
+                # Save current group if exists
+                if current_group:
+                    groups.append(current_group)
+                    current_group = []
+                    current_tokens = 0
+
+                # Single oversized item becomes its own group
+                groups.append([item])
+                logger.warning(
+                    f"Single list item exceeds token limit "
+                    f"({item_tokens} > {max_tokens}). "
+                    f"Keeping as-is to preserve semantic boundary."
+                )
+                continue
+
+            # Check if adding this item would exceed limit
+            if current_tokens + item_tokens > max_tokens:
+                # Save current group and start new one
+                groups.append(current_group)
+                current_group = [item]
+                current_tokens = item_tokens
+            else:
+                # Add to current group
+                current_group.append(item)
+                current_tokens += item_tokens
+
+        # Add last group
+        if current_group:
+            groups.append(current_group)
+
+        return groups
+
+    def _split_oversized_by_list_items(
+        self,
+        chunk: Chunk
+    ) -> list[Chunk]:
+        """Split oversized chunk by list item boundaries.
+
+        Args:
+            chunk: Chunk that exceeds token limit
+
+        Returns:
+            List of smaller chunks split at list item boundaries
+
+        Examples:
+            >>> splitter = MarkdownSplitter()
+            >>> # Assume chunk has 2000 tokens with many list items
+            >>> sub_chunks = splitter._split_oversized_by_list_items(chunk)
+            >>> all(c.metadata.token_count <= 1000 for c in sub_chunks)
+            True
+        """
+        # Parse list items
+        items = self._parse_list_items(chunk.content)
+
+        if len(items) < 2:
+            # Cannot split further by list items
+            logger.warning(
+                f"Chunk {chunk.chunk_id} has < 2 list items. "
+                f"Cannot split further while preserving semantic boundaries."
+            )
+            return [chunk]
+
+        # Group items by token limit
+        groups = self._group_items_by_tokens(items, self.max_tokens_per_chunk)
+
+        if len(groups) == 1:
+            # All items fit in one group (shouldn't happen for oversized chunks)
+            return [chunk]
+
+        # Create sub-chunks
+        sub_chunks = []
+        for i, group in enumerate(groups):
+            sub_content = '\n'.join(group)
+            sub_tokens = self.estimate_tokens(sub_content)
+
+            # Copy metadata from parent chunk
+            sub_metadata = ChunkMetadata(
+                h1=chunk.metadata.h1,
+                h2=chunk.metadata.h2,
+                h3=chunk.metadata.h3,
+                h4=chunk.metadata.h4,
+                h5=chunk.metadata.h5,
+                h6=chunk.metadata.h6,
+                original_position=chunk.metadata.original_position,
+                token_count=sub_tokens,
+            )
+
+            # Generate new chunk ID
+            sub_chunk_id = f"{chunk.chunk_id}-{i}"
+
+            sub_chunk = Chunk(
+                chunk_id=sub_chunk_id,
+                content=sub_content,
+                metadata=sub_metadata,
+            )
+
+            sub_chunks.append(sub_chunk)
+
+        logger.info(
+            f"Split chunk {chunk.chunk_id} ({chunk.metadata.token_count} tokens) "
+            f"into {len(sub_chunks)} sub-chunks by list items"
+        )
+
+        return sub_chunks
+
+    def _split_oversized_by_paragraphs(
+        self,
+        chunk: Chunk
+    ) -> list[Chunk]:
+        """Split oversized chunk by paragraph boundaries.
+
+        Args:
+            chunk: Chunk that exceeds token limit
+
+        Returns:
+            List of smaller chunks split at paragraph boundaries
+        """
+        # Split by double newlines (paragraph separator)
+        paragraphs = [p for p in chunk.content.split('\n\n') if p.strip()]
+
+        if len(paragraphs) < 2:
+            logger.warning(
+                f"Chunk {chunk.chunk_id} has < 2 paragraphs. "
+                f"Cannot split further while preserving semantic boundaries."
+            )
+            return [chunk]
+
+        # Group paragraphs by token limit
+        groups = self._group_items_by_tokens(paragraphs, self.max_tokens_per_chunk)
+
+        if len(groups) == 1:
+            return [chunk]
+
+        # Create sub-chunks
+        sub_chunks = []
+        for i, group in enumerate(groups):
+            sub_content = '\n\n'.join(group)
+            sub_tokens = self.estimate_tokens(sub_content)
+
+            sub_metadata = ChunkMetadata(
+                h1=chunk.metadata.h1,
+                h2=chunk.metadata.h2,
+                h3=chunk.metadata.h3,
+                h4=chunk.metadata.h4,
+                h5=chunk.metadata.h5,
+                h6=chunk.metadata.h6,
+                original_position=chunk.metadata.original_position,
+                token_count=sub_tokens,
+            )
+
+            sub_chunk_id = f"{chunk.chunk_id}-{i}"
+
+            sub_chunk = Chunk(
+                chunk_id=sub_chunk_id,
+                content=sub_content,
+                metadata=sub_metadata,
+            )
+
+            sub_chunks.append(sub_chunk)
+
+        logger.info(
+            f"Split chunk {chunk.chunk_id} ({chunk.metadata.token_count} tokens) "
+            f"into {len(sub_chunks)} sub-chunks by paragraphs"
+        )
+
+        return sub_chunks
+
+    def _split_oversized_chunk(self, chunk: Chunk) -> list[Chunk]:
+        """Split oversized chunk using semantic boundaries.
+
+        Tries multiple strategies in order:
+        1. Split by list items (if many list items present)
+        2. Split by paragraphs (if many paragraphs present)
+        3. Keep as-is with warning (if no semantic boundaries found)
+
+        Args:
+            chunk: Chunk that exceeds token limit
+
+        Returns:
+            List of chunks (original if cannot split, or multiple smaller chunks)
+        """
+        # Try list item splitting first
+        items = self._parse_list_items(chunk.content)
+        if len(items) >= 5:  # Threshold: at least 5 list items
+            return self._split_oversized_by_list_items(chunk)
+
+        # Try paragraph splitting
+        paragraphs = [p for p in chunk.content.split('\n\n') if p.strip()]
+        if len(paragraphs) >= 3:  # Threshold: at least 3 paragraphs
+            return self._split_oversized_by_paragraphs(chunk)
+
+        # No semantic boundaries found - keep as-is
+        logger.warning(
+            f"Chunk {chunk.chunk_id} exceeds token limit "
+            f"({chunk.metadata.token_count} > {self.max_tokens_per_chunk}) "
+            f"but no semantic boundaries found for splitting. "
+            f"Keeping as-is to preserve semantic integrity."
+        )
+        return [chunk]
