@@ -79,6 +79,9 @@ class TestChunkMetadata:
             "h1": "Intro",
             "h2": "Background",
             "h3": "Context",
+            "h4": None,
+            "h5": None,
+            "h6": None,
             "original_position": 3,
             "token_count": 200,
         }

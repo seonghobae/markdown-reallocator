@@ -13,6 +13,9 @@ class ChunkMetadata:
         h1: Level 1 header (# Title) if present
         h2: Level 2 header (## Title) if present
         h3: Level 3 header (### Title) if present
+        h4: Level 4 header (#### Title) if present
+        h5: Level 5 header (##### Title) if present
+        h6: Level 6 header (###### Title) if present
         original_position: Position in original document (0-indexed)
         token_count: Estimated token count for this chunk
     """
@@ -20,6 +23,9 @@ class ChunkMetadata:
     h1: str | None = None
     h2: str | None = None
     h3: str | None = None
+    h4: str | None = None
+    h5: str | None = None
+    h6: str | None = None
     original_position: int = 0
     token_count: int = 0
 
@@ -34,14 +40,14 @@ class ChunkMetadata:
         """Return header hierarchy as string.
 
         Returns:
-            Header path in format "H1 > H2 > H3", omitting None headers.
+            Header path in format "H1 > H2 > H3 > H4 > H5 > H6", omitting None headers.
 
         Examples:
             >>> meta = ChunkMetadata(h1="Intro", h2="Setup")
             >>> meta.header_path()
             'Intro > Setup'
         """
-        headers = [h for h in [self.h1, self.h2, self.h3] if h is not None]
+        headers = [h for h in [self.h1, self.h2, self.h3, self.h4, self.h5, self.h6] if h is not None]
         return " > ".join(headers) if headers else ""
 
     def to_dict(self) -> dict[str, str | int | None]:
@@ -50,6 +56,9 @@ class ChunkMetadata:
             "h1": self.h1,
             "h2": self.h2,
             "h3": self.h3,
+            "h4": self.h4,
+            "h5": self.h5,
+            "h6": self.h6,
             "original_position": self.original_position,
             "token_count": self.token_count,
         }
@@ -61,6 +70,9 @@ class ChunkMetadata:
         h1_val = data.get("h1")
         h2_val = data.get("h2")
         h3_val = data.get("h3")
+        h4_val = data.get("h4")
+        h5_val = data.get("h5")
+        h6_val = data.get("h6")
         pos_val = data.get("original_position")
         tok_val = data.get("token_count")
 
@@ -68,6 +80,9 @@ class ChunkMetadata:
             h1=h1_val if isinstance(h1_val, str) else None,
             h2=h2_val if isinstance(h2_val, str) else None,
             h3=h3_val if isinstance(h3_val, str) else None,
+            h4=h4_val if isinstance(h4_val, str) else None,
+            h5=h5_val if isinstance(h5_val, str) else None,
+            h6=h6_val if isinstance(h6_val, str) else None,
             original_position=int(pos_val) if pos_val is not None else 0,
             token_count=int(tok_val) if tok_val is not None else 0,
         )

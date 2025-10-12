@@ -48,6 +48,9 @@ class MarkdownSplitter:
             ("#", "h1"),
             ("##", "h2"),
             ("###", "h3"),
+            ("####", "h4"),
+            ("#####", "h5"),
+            ("######", "h6"),
         ]
         self.max_tokens_per_chunk = max_tokens_per_chunk
 
@@ -103,6 +106,9 @@ class MarkdownSplitter:
         h1 = langchain_metadata.get("h1")
         h2 = langchain_metadata.get("h2")
         h3 = langchain_metadata.get("h3")
+        h4 = langchain_metadata.get("h4")
+        h5 = langchain_metadata.get("h5")
+        h6 = langchain_metadata.get("h6")
 
         # Estimate tokens
         token_count = self.estimate_tokens(content)
@@ -111,6 +117,9 @@ class MarkdownSplitter:
             h1=h1,
             h2=h2,
             h3=h3,
+            h4=h4,
+            h5=h5,
+            h6=h6,
             original_position=position,
             token_count=token_count,
         )
@@ -248,6 +257,12 @@ class MarkdownSplitter:
                 headers_used.add("h2")
             if chunk.metadata.h3:
                 headers_used.add("h3")
+            if chunk.metadata.h4:
+                headers_used.add("h4")
+            if chunk.metadata.h5:
+                headers_used.add("h5")
+            if chunk.metadata.h6:
+                headers_used.add("h6")
 
         metadata = {
             "total_chunks": len(chunks),

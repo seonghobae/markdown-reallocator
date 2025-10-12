@@ -255,6 +255,12 @@ class SearchModule:
                     lines.append(f"    H2: {metadata.h2}")
                 if metadata.h3:
                     lines.append(f"    H3: {metadata.h3}")
+                if metadata.h4:
+                    lines.append(f"    H4: {metadata.h4}")
+                if metadata.h5:
+                    lines.append(f"    H5: {metadata.h5}")
+                if metadata.h6:
+                    lines.append(f"    H6: {metadata.h6}")
                 lines.append(f"    Position: {metadata.original_position}")
 
             # Content preview (first 100 chars)
@@ -296,6 +302,9 @@ class SearchModule:
                     "h1": chunk.metadata.h1,
                     "h2": chunk.metadata.h2,
                     "h3": chunk.metadata.h3,
+                    "h4": chunk.metadata.h4,
+                    "h5": chunk.metadata.h5,
+                    "h6": chunk.metadata.h6,
                     "original_position": chunk.metadata.original_position,
                 }
 

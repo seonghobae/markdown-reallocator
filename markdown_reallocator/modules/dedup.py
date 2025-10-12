@@ -231,10 +231,16 @@ class DeduplicationModule:
                 meta = chunks[idx].metadata
                 score = 0
                 if meta.h1:
-                    score += 3
+                    score += 6
                 if meta.h2:
-                    score += 2
+                    score += 5
                 if meta.h3:
+                    score += 4
+                if meta.h4:
+                    score += 3
+                if meta.h5:
+                    score += 2
+                if meta.h6:
                     score += 1
                 return score
 

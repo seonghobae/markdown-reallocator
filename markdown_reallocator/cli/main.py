@@ -189,6 +189,9 @@ def split(
                     "h1": c.metadata.h1,
                     "h2": c.metadata.h2,
                     "h3": c.metadata.h3,
+                    "h4": c.metadata.h4,
+                    "h5": c.metadata.h5,
+                    "h6": c.metadata.h6,
                     "original_position": c.metadata.original_position,
                 },
             }
@@ -256,6 +259,9 @@ def embed(
                     h1=data["metadata"].get("h1"),
                     h2=data["metadata"].get("h2"),
                     h3=data["metadata"].get("h3"),
+                    h4=data["metadata"].get("h4"),
+                    h5=data["metadata"].get("h5"),
+                    h6=data["metadata"].get("h6"),
                     original_position=data["metadata"]["original_position"],
                 ),
             )
@@ -355,6 +361,9 @@ def search(
                     h1=data["metadata"].get("h1"),
                     h2=data["metadata"].get("h2"),
                     h3=data["metadata"].get("h3"),
+                    h4=data["metadata"].get("h4"),
+                    h5=data["metadata"].get("h5"),
+                    h6=data["metadata"].get("h6"),
                     original_position=data["metadata"]["original_position"],
                 ),
             )
@@ -433,6 +442,9 @@ def reorder(
                     h1=data["metadata"].get("h1"),
                     h2=data["metadata"].get("h2"),
                     h3=data["metadata"].get("h3"),
+                    h4=data["metadata"].get("h4"),
+                    h5=data["metadata"].get("h5"),
+                    h6=data["metadata"].get("h6"),
                     original_position=data["metadata"]["original_position"],
                 ),
             )
@@ -520,6 +532,9 @@ def dedup(
                     h1=data["metadata"].get("h1"),
                     h2=data["metadata"].get("h2"),
                     h3=data["metadata"].get("h3"),
+                    h4=data["metadata"].get("h4"),
+                    h5=data["metadata"].get("h5"),
+                    h6=data["metadata"].get("h6"),
                     original_position=data["metadata"]["original_position"],
                 ),
             )
@@ -552,6 +567,9 @@ def dedup(
                         "h1": c.metadata.h1,
                         "h2": c.metadata.h2,
                         "h3": c.metadata.h3,
+                        "h4": c.metadata.h4,
+                        "h5": c.metadata.h5,
+                        "h6": c.metadata.h6,
                         "original_position": c.metadata.original_position,
                     },
                 }
