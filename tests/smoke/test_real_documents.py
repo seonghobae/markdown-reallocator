@@ -170,4 +170,5 @@ class TestDocumentComplexity:
         # Splitting should create reasonable number of chunks
         splitter = MarkdownSplitter(max_tokens_per_chunk=500)
         chunks = splitter.split(clean_content)
-        assert 5 < len(chunks) < 200, "Should create reasonable number of chunks"
+        # With h4-h6 support, more granular splitting is expected
+        assert 5 < len(chunks) < 500, "Should create reasonable number of chunks (with h4-h6 support)"

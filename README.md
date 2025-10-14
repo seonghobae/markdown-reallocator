@@ -60,16 +60,30 @@ ollama pull gemma:2b-instruct-q4_0  # Optional, for LLM-based deduplication
 
 ### 2. Install Markdown Reallocator
 
+**Using pip**:
 ```bash
 pip install markdown-reallocator
 ```
 
-Or install from source:
+**Using uv** (recommended for development):
+```bash
+# Install uv first: https://github.com/astral-sh/uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
+# Install package
+uv pip install markdown-reallocator
+```
+
+**Install from source**:
 ```bash
 git clone https://github.com/seonghobae/markdown-reallocator.git
 cd markdown-reallocator
+
+# Using pip
 pip install -e .
+
+# Or using uv (editable mode)
+uv pip install -e .
 ```
 
 ### 3. Verify Installation
@@ -124,11 +138,66 @@ chunks = processor.load("input.md").preprocess().split().get_chunks()
 results = processor.search("find related content", top_k=5)
 ```
 
+### Advanced: HybridMarkdownParser
+
+For advanced use cases requiring precise control over markdown parsing with metadata enrichment:
+
+```python
+from markdown_reallocator.core.parser import HybridMarkdownParser
+from markdown_reallocator.models.chunk import ElementType
+
+# Create parser with custom token limit
+parser = HybridMarkdownParser(max_tokens_per_chunk=1000)
+
+# Parse markdown text
+chunks = parser.parse_text("""
+# Introduction
+
+## Section 1: Getting Started
+
+### Stage 1: Setup
+
+Install dependencies...
+""")
+
+# Analyze parsed chunks
+for chunk in chunks:
+    print(f"Chunk ID: {chunk.chunk_id}")
+    print(f"  Type: {chunk.metadata.element_type.value}")
+    print(f"  Headers: h1={chunk.metadata.h1}, h2={chunk.metadata.h2}")
+    print(f"  Tokens: {chunk.metadata.token_count}")
+
+    # Detect procedural steps (Stage N, Step N)
+    if chunk.metadata.sequence_number:
+        print(f"  Sequence: {chunk.metadata.sequence_number}")
+
+# Parse from file
+chunks = parser.parse_file("document.md")
+
+# Group chunks by section
+sections = {}
+for chunk in chunks:
+    section_key = f"{chunk.metadata.h1} > {chunk.metadata.h2}"
+    if section_key not in sections:
+        sections[section_key] = []
+    sections[section_key].append(chunk)
+```
+
+**Features**:
+- 🔍 **Precise Header Tracking**: Hierarchical h1-h6 cascading
+- 🏷️ **Element Classification**: TITLE, NARRATIVE_TEXT, LIST_ITEM, CODE_SNIPPET, PROCEDURE_STEP
+- 🔢 **Sequence Detection**: Auto-detect "Stage N", "Step N", "Phase N" patterns
+- 📊 **Rich Metadata**: parent_id, depth_level, token_count, and more
+- 🔗 **unstructured.io Integration**: Leverages production-ready markdown parsing
+
+See [examples/quick_start.py](examples/quick_start.py) for a complete example.
+
 ## Documentation
 
 - [Installation Guide](docs/installation.md)
 - [User Guide](docs/user-guide/)
 - [API Reference](docs/api-reference/)
+- [Semantic Chunking Strategy](docs/semantic_chunking_strategy.md) - Design philosophy and validation
 - [Examples](examples/)
 
 ## Development
@@ -140,40 +209,43 @@ results = processor.search("find related content", top_k=5)
 git clone https://github.com/seonghobae/markdown-reallocator.git
 cd markdown-reallocator
 
-# Install with dev dependencies
+# Install with dev dependencies (using uv, recommended)
+uv pip install -e ".[dev]"
+
+# Or using pip
 pip install -e ".[dev]"
 
 # Verify setup
-pytest tests/smoke/
+uv run pytest tests/smoke/
 ```
 
 ### Testing
 
 ```bash
 # Run all tests
-pytest
+uv run pytest
 
 # Run with coverage
-pytest --cov
+uv run pytest --cov
 
 # Run only smoke tests
-pytest tests/smoke/
+uv run pytest tests/smoke/
 
 # Run specific test
-pytest tests/unit/test_preprocessor.py
+uv run pytest tests/unit/test_parser.py
 ```
 
 ### Linting
 
 ```bash
 # Check code style
-ruff check .
+uv run ruff check .
 
 # Fix auto-fixable issues
-ruff check --fix .
+uv run ruff check --fix .
 
 # Type checking
-mypy markdown_reallocator
+uv run mypy markdown_reallocator
 ```
 
 ## Performance

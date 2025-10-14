@@ -39,6 +39,8 @@ dependencies = [
     "typer[all]>=0.18.0", # >=0.18.0 required for click 8.3.0 compatibility
     "rich>=13.0.0",
     "pyyaml>=6.0",
+    "unstructured>=0.18.15",
+    "markdown>=3.9",
 ]
 
 [project.optional-dependencies]

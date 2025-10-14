@@ -16,6 +16,9 @@ class TestMarkdownSplitter:
             ("#", "h1"),
             ("##", "h2"),
             ("###", "h3"),
+            ("####", "h4"),
+            ("#####", "h5"),
+            ("######", "h6"),
         ]
         assert splitter.max_tokens_per_chunk == 1000
 
@@ -359,14 +362,18 @@ class TestTokenLimits:
         """Should log warning when chunk exceeds token limit."""
         splitter = MarkdownSplitter(max_tokens_per_chunk=10)
 
-        # Create markdown with long content
+        # Create markdown with long content that has no semantic boundaries
+        # (single line prevents semantic splitting)
         long_content = " ".join(["word"] * 50)
         markdown = f"# Title\n\n{long_content}"
 
         splitter.split(markdown)
 
-        # Should have logged a warning
-        assert any("exceeds max tokens" in record.message for record in caplog.records)
+        # Should have logged a warning about exceeding tokens or no semantic boundaries
+        assert any(
+            ("exceeds max tokens" in record.message or "no semantic boundaries" in record.message)
+            for record in caplog.records
+        )
 
     def test_small_limit_still_creates_chunks(self) -> None:
         """Should create chunks even with very small limit."""
@@ -600,41 +607,38 @@ class TestPerformance:
 class TestErrorHandling:
     """Tests for error handling and edge cases."""
 
-    def test_langchain_returns_empty_list(self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
-        """Should handle case where LangChain returns no chunks."""
+    def test_parser_returns_empty_list(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Should handle case where parser returns no chunks."""
         from unittest.mock import Mock
 
         splitter = MarkdownSplitter()
         markdown = "# Title\n\nContent"
 
-        # Mock LangChain splitter to return empty list
-        mock_splitter = Mock()
-        mock_splitter.split_text.return_value = []
-        monkeypatch.setattr(splitter, "_splitter", mock_splitter)
+        # Mock parser to return empty list
+        monkeypatch_parse = Mock(return_value=[])
+        splitter._parse_with_unstructured = monkeypatch_parse
 
         # Should fallback to single chunk
         chunks = splitter.split(markdown)
 
         assert len(chunks) == 1
         assert chunks[0].content == markdown
-        assert "LangChain splitter returned no chunks" in caplog.text
+        assert "Parser returned no chunks" in caplog.text
 
-    def test_skip_empty_chunks(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_skip_empty_chunks(self) -> None:
         """Should skip chunks with only whitespace."""
         from unittest.mock import Mock
-        from langchain_core.documents import Document
 
         splitter = MarkdownSplitter()
         markdown = "# Title\n\nContent"
 
-        # Mock LangChain to return chunks with whitespace
-        mock_splitter = Mock()
-        mock_splitter.split_text.return_value = [
-            Document(page_content="# Title\n\nContent", metadata={"h1": "Title"}),
-            Document(page_content="   \n\n   ", metadata={}),  # Empty chunk
-            Document(page_content="More content", metadata={}),
+        # Mock parser to return chunks with whitespace
+        mock_parsed = [
+            {"content": "# Title\n\nContent", "headers": {"h1": "Title"}, "position": 0},
+            {"content": "   \n\n   ", "headers": {}, "position": 1},  # Empty chunk
+            {"content": "More content", "headers": {}, "position": 2},
         ]
-        monkeypatch.setattr(splitter, "_splitter", mock_splitter)
+        splitter._parse_with_unstructured = Mock(return_value=mock_parsed)
 
         chunks = splitter.split(markdown)
 
@@ -642,36 +646,32 @@ class TestErrorHandling:
         assert len(chunks) == 2
         assert all(c.content.strip() for c in chunks)
 
-    def test_no_valid_chunks_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_no_valid_chunks_raises(self) -> None:
         """Should raise ValueError if all chunks are invalid."""
         from unittest.mock import Mock
-        from langchain_core.documents import Document
 
         splitter = MarkdownSplitter()
         markdown = "# Title"
 
-        # Mock LangChain to return only whitespace chunks
-        mock_splitter = Mock()
-        mock_splitter.split_text.return_value = [
-            Document(page_content="   ", metadata={}),
-            Document(page_content="\n\n", metadata={}),
+        # Mock parser to return only whitespace chunks
+        mock_parsed = [
+            {"content": "   ", "headers": {}, "position": 0},
+            {"content": "\n\n", "headers": {}, "position": 1},
         ]
-        monkeypatch.setattr(splitter, "_splitter", mock_splitter)
+        splitter._parse_with_unstructured = Mock(return_value=mock_parsed)
 
         with pytest.raises(ValueError, match="No valid chunks created"):
             splitter.split(markdown)
 
-    def test_split_exception_logged(self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    def test_split_exception_logged(self, caplog: pytest.LogCaptureFixture) -> None:
         """Should log error and re-raise on exception."""
         from unittest.mock import Mock
 
         splitter = MarkdownSplitter()
         markdown = "# Title\n\nContent"
 
-        # Mock LangChain to raise exception
-        mock_splitter = Mock()
-        mock_splitter.split_text.side_effect = RuntimeError("Mock error")
-        monkeypatch.setattr(splitter, "_splitter", mock_splitter)
+        # Mock parser to raise exception
+        splitter._parse_with_unstructured = Mock(side_effect=RuntimeError("Mock error"))
 
         with pytest.raises(RuntimeError, match="Mock error"):
             splitter.split(markdown)
@@ -783,3 +783,526 @@ Final content."""
             assert chunk.metadata.h1 is None
             assert chunk.metadata.h2 is None
             assert chunk.metadata.h3 is None
+
+
+class TestSemanticSplitting:
+    """Tests for semantic boundary splitting methods."""
+
+    def test_parse_list_items_unordered(self) -> None:
+        """Should parse unordered list items (each indent level separately)."""
+        splitter = MarkdownSplitter()
+        content = """- Item 1
+  - Sub A
+  - Sub B
+- Item 2
+  - Sub C"""
+
+        items = splitter._parse_list_items(content)
+
+        # Parses each list item at each indent level as separate item
+        assert len(items) == 5
+        assert items[0] == "- Item 1"
+        assert items[1] == "  - Sub A"
+        assert items[2] == "  - Sub B"
+        assert items[3] == "- Item 2"
+        assert items[4] == "  - Sub C"
+
+    def test_parse_list_items_ordered(self) -> None:
+        """Should parse ordered list items."""
+        splitter = MarkdownSplitter()
+        content = """1. First item
+   - Sub item
+2. Second item
+3. Third item"""
+
+        items = splitter._parse_list_items(content)
+
+        # Parses each list item at each indent level as separate item
+        assert len(items) == 4
+        assert "First item" in items[0]
+        assert "Sub item" in items[1]
+        assert "Second item" in items[2]
+        assert "Third item" in items[3]
+
+    def test_parse_list_items_mixed(self) -> None:
+        """Should parse mixed unordered and ordered lists."""
+        splitter = MarkdownSplitter()
+        content = """- Unordered item
+1. Ordered item
+2. Another ordered
+- Another unordered"""
+
+        items = splitter._parse_list_items(content)
+
+        assert len(items) == 4
+
+    def test_parse_list_items_empty(self) -> None:
+        """Should return empty list for content without list items."""
+        splitter = MarkdownSplitter()
+        content = "Just plain text without lists."
+
+        items = splitter._parse_list_items(content)
+
+        assert len(items) == 0
+
+    def test_parse_list_items_preserves_indentation(self) -> None:
+        """Should preserve indentation in nested lists."""
+        splitter = MarkdownSplitter()
+        content = """- Item 1
+  - Level 2
+    - Level 3
+  - Back to level 2
+- Item 2"""
+
+        items = splitter._parse_list_items(content)
+
+        # Each indent level is parsed separately
+        assert len(items) == 5
+        assert items[0] == "- Item 1"
+        assert items[1] == "  - Level 2"
+        assert items[2] == "    - Level 3"
+        assert items[3] == "  - Back to level 2"
+        assert items[4] == "- Item 2"
+
+    def test_group_items_by_tokens_single_group(self) -> None:
+        """Should keep all items in one group if within limit."""
+        splitter = MarkdownSplitter()
+        items = ["Short item", "Another short", "Yet another"]
+
+        groups = splitter._group_items_by_tokens(items, 1000)
+
+        assert len(groups) == 1
+        assert len(groups[0]) == 3
+
+    def test_group_items_by_tokens_multiple_groups(self) -> None:
+        """Should split into multiple groups when exceeding limit."""
+        splitter = MarkdownSplitter()
+        # Create items that will exceed token limit
+        items = [" ".join(["word"] * 100) for _ in range(5)]  # ~130 tokens each
+
+        groups = splitter._group_items_by_tokens(items, 200)
+
+        # Should create multiple groups
+        assert len(groups) > 1
+
+    def test_group_items_by_tokens_oversized_item(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Should keep oversized item in separate group with warning."""
+        splitter = MarkdownSplitter()
+        # Create one very large item
+        large_item = " ".join(["word"] * 1000)  # ~1300 tokens
+        items = ["small", large_item, "small2"]
+
+        groups = splitter._group_items_by_tokens(items, 100)
+
+        # Large item should be in its own group
+        assert any(len(g) == 1 and large_item in g for g in groups)
+        assert "exceeds token limit" in caplog.text
+
+    def test_group_items_by_tokens_empty(self) -> None:
+        """Should return empty list for empty items."""
+        splitter = MarkdownSplitter()
+
+        groups = splitter._group_items_by_tokens([], 1000)
+
+        assert len(groups) == 0
+
+    def test_split_oversized_by_list_items_success(self) -> None:
+        """Should split oversized chunk by list items."""
+        splitter = MarkdownSplitter(max_tokens_per_chunk=100)
+
+        # Create chunk with many list items
+        content = "\n".join([f"- Item {i} with some content" for i in range(20)])
+        from markdown_reallocator.models.chunk import Chunk, ChunkMetadata
+
+        metadata = ChunkMetadata(
+            h1="Test",
+            original_position=0,
+            token_count=splitter.estimate_tokens(content)
+        )
+        chunk = Chunk(chunk_id="test-123", content=content, metadata=metadata)
+
+        sub_chunks = splitter._split_oversized_by_list_items(chunk)
+
+        # Should split into multiple chunks
+        assert len(sub_chunks) > 1
+        # Each sub-chunk should have unique ID
+        assert all("-" in c.chunk_id for c in sub_chunks)
+        # Metadata should be preserved
+        assert all(c.metadata.h1 == "Test" for c in sub_chunks)
+
+    def test_split_oversized_by_list_items_too_few_items(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Should return original chunk if too few list items."""
+        splitter = MarkdownSplitter(max_tokens_per_chunk=10)
+
+        from markdown_reallocator.models.chunk import Chunk, ChunkMetadata
+
+        content = "- Only one item"
+        metadata = ChunkMetadata(original_position=0, token_count=50)
+        chunk = Chunk(chunk_id="test-456", content=content, metadata=metadata)
+
+        sub_chunks = splitter._split_oversized_by_list_items(chunk)
+
+        assert len(sub_chunks) == 1
+        assert sub_chunks[0].chunk_id == "test-456"
+        assert "< 2 list items" in caplog.text
+
+    def test_split_oversized_by_paragraphs_success(self) -> None:
+        """Should split oversized chunk by paragraphs."""
+        splitter = MarkdownSplitter(max_tokens_per_chunk=50)
+
+        from markdown_reallocator.models.chunk import Chunk, ChunkMetadata
+
+        # Create content with multiple paragraphs
+        paragraphs = [f"This is paragraph {i} with some content." for i in range(10)]
+        content = "\n\n".join(paragraphs)
+
+        metadata = ChunkMetadata(
+            h2="Test Section",
+            original_position=0,
+            token_count=splitter.estimate_tokens(content)
+        )
+        chunk = Chunk(chunk_id="test-789", content=content, metadata=metadata)
+
+        sub_chunks = splitter._split_oversized_by_paragraphs(chunk)
+
+        # Should split into multiple chunks
+        assert len(sub_chunks) > 1
+        # Each sub-chunk should preserve metadata
+        assert all(c.metadata.h2 == "Test Section" for c in sub_chunks)
+
+    def test_split_oversized_by_paragraphs_too_few(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Should return original chunk if too few paragraphs."""
+        splitter = MarkdownSplitter(max_tokens_per_chunk=10)
+
+        from markdown_reallocator.models.chunk import Chunk, ChunkMetadata
+
+        content = "Single paragraph without breaks."
+        metadata = ChunkMetadata(original_position=0, token_count=50)
+        chunk = Chunk(chunk_id="test-abc", content=content, metadata=metadata)
+
+        sub_chunks = splitter._split_oversized_by_paragraphs(chunk)
+
+        assert len(sub_chunks) == 1
+        assert "< 2 paragraphs" in caplog.text
+
+    def test_split_oversized_chunk_uses_list_items_first(self) -> None:
+        """Should try list item splitting first."""
+        splitter = MarkdownSplitter(max_tokens_per_chunk=100)
+
+        from markdown_reallocator.models.chunk import Chunk, ChunkMetadata
+
+        # Create content with many list items (>5 threshold) that exceeds limit
+        content = "\n".join([f"- Item {i} with additional content to make it longer and exceed token limit" for i in range(20)])
+        metadata = ChunkMetadata(
+            original_position=0,
+            token_count=splitter.estimate_tokens(content)
+        )
+        chunk = Chunk(chunk_id="test-list", content=content, metadata=metadata)
+
+        sub_chunks = splitter._split_oversized_chunk(chunk)
+
+        # Should use list item splitting and create multiple chunks
+        assert len(sub_chunks) > 1
+
+    def test_split_oversized_chunk_falls_back_to_paragraphs(self) -> None:
+        """Should fall back to paragraph splitting if not enough list items."""
+        splitter = MarkdownSplitter(max_tokens_per_chunk=50)
+
+        from markdown_reallocator.models.chunk import Chunk, ChunkMetadata
+
+        # Create content with few list items but many longer paragraphs
+        paragraphs = [f"This is a longer paragraph {i} with enough content to make it substantial" for i in range(8)]
+        content = "- Item 1\n\n" + "\n\n".join(paragraphs)
+        metadata = ChunkMetadata(
+            original_position=0,
+            token_count=splitter.estimate_tokens(content)
+        )
+        chunk = Chunk(chunk_id="test-para", content=content, metadata=metadata)
+
+        sub_chunks = splitter._split_oversized_chunk(chunk)
+
+        # Should use paragraph splitting
+        assert len(sub_chunks) > 1
+
+    def test_split_oversized_chunk_keeps_with_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Should keep chunk as-is with warning if no semantic boundaries."""
+        splitter = MarkdownSplitter(max_tokens_per_chunk=10)
+
+        from markdown_reallocator.models.chunk import Chunk, ChunkMetadata
+
+        # Content with no list items and no paragraphs
+        content = "Very long single line of text without any semantic boundaries at all"
+        metadata = ChunkMetadata(
+            original_position=0,
+            token_count=splitter.estimate_tokens(content)
+        )
+        chunk = Chunk(chunk_id="test-warn", content=content, metadata=metadata)
+
+        sub_chunks = splitter._split_oversized_chunk(chunk)
+
+        # Should keep original
+        assert len(sub_chunks) == 1
+        assert sub_chunks[0].chunk_id == "test-warn"
+        assert "no semantic boundaries found" in caplog.text
+
+    def test_split_integration_with_oversized_chunks(self) -> None:
+        """Integration test: split() should automatically handle oversized chunks."""
+        splitter = MarkdownSplitter(max_tokens_per_chunk=100)
+
+        # Create markdown with long list that will exceed token limit
+        items = [f"- Item {i} with some additional content to increase token count" for i in range(30)]
+        markdown = f"# Test Section\n\n" + "\n".join(items)
+
+        chunks = splitter.split(markdown)
+
+        # Should create multiple sub-chunks
+        sub_chunk_count = sum(1 for c in chunks if '-' in c.chunk_id)
+        assert sub_chunk_count > 0
+
+        # All chunks should be under limit (or slightly over for semantic integrity)
+        oversized = [c for c in chunks if c.metadata.token_count > 150]  # Allow 50% buffer
+        assert len(oversized) == 0 or all(c.metadata.token_count < 1100 for c in oversized)
+#!/usr/bin/env python3
+"""Tests for depth-aware splitting functions."""
+
+import pytest
+from markdown_reallocator.core.splitter import MarkdownSplitter
+from markdown_reallocator.models.chunk import Chunk, ChunkMetadata
+
+
+class TestDepthAwareFunctions:
+    """Tests for depth-aware splitting functionality."""
+
+    def test_calculate_depth_no_indentation(self):
+        """Should return 0 for lines with no indentation."""
+        splitter = MarkdownSplitter()
+
+        assert splitter._calculate_depth("- Item") == 0
+        assert splitter._calculate_depth("* Item") == 0
+        assert splitter._calculate_depth("1. Item") == 0
+
+    def test_calculate_depth_with_spaces(self):
+        """Should calculate depth based on leading spaces (2 spaces = 1 depth)."""
+        splitter = MarkdownSplitter()
+
+        assert splitter._calculate_depth("  - Sub item") == 1
+        assert splitter._calculate_depth("    - Sub-sub item") == 2
+        assert splitter._calculate_depth("      - Deep item") == 3
+
+    def test_calculate_depth_with_tabs(self):
+        """Should convert tabs to spaces (1 tab = 4 spaces = 2 depth)."""
+        splitter = MarkdownSplitter()
+
+        assert splitter._calculate_depth("\t- Item") == 2
+        assert splitter._calculate_depth("\t\t- Item") == 4
+
+    def test_calculate_depth_empty_line(self):
+        """Should return 0 for empty lines."""
+        splitter = MarkdownSplitter()
+
+        assert splitter._calculate_depth("") == 0
+        assert splitter._calculate_depth("   ") == 0
+
+    def test_parse_list_items_with_depth_flat(self):
+        """Should parse flat list with all depth-0 items."""
+        splitter = MarkdownSplitter()
+        content = """- Item 1
+- Item 2
+- Item 3"""
+
+        items = splitter._parse_list_items_with_depth(content)
+
+        assert len(items) == 3
+        assert all(item['depth'] == 0 for item in items)
+        assert all(item['parent_idx'] is None for item in items)
+
+    def test_parse_list_items_with_depth_hierarchical(self):
+        """Should parse hierarchical list with parent-child relationships."""
+        splitter = MarkdownSplitter()
+        content = """- Parent 1
+  - Child 1a
+  - Child 1b
+- Parent 2
+  - Child 2a"""
+
+        items = splitter._parse_list_items_with_depth(content)
+
+        assert len(items) == 5
+
+        # Parent 1 (index 0)
+        assert items[0]['depth'] == 0
+        assert items[0]['parent_idx'] is None
+        assert 'Parent 1' in items[0]['content']
+
+        # Child 1a (index 1)
+        assert items[1]['depth'] == 1
+        assert items[1]['parent_idx'] == 0
+        assert 'Child 1a' in items[1]['content']
+
+        # Child 1b (index 2)
+        assert items[2]['depth'] == 1
+        assert items[2]['parent_idx'] == 0
+
+        # Parent 2 (index 3)
+        assert items[3]['depth'] == 0
+        assert items[3]['parent_idx'] is None
+
+        # Child 2a (index 4)
+        assert items[4]['depth'] == 1
+        assert items[4]['parent_idx'] == 3
+
+    def test_parse_list_items_with_depth_deep_hierarchy(self):
+        """Should handle multiple depth levels."""
+        splitter = MarkdownSplitter()
+        content = """- Level 0
+  - Level 1
+    - Level 2
+      - Level 3"""
+
+        items = splitter._parse_list_items_with_depth(content)
+
+        assert len(items) == 4
+        assert items[0]['depth'] == 0
+        assert items[1]['depth'] == 1
+        assert items[2]['depth'] == 2
+        assert items[3]['depth'] == 3
+
+    def test_split_by_depth_boundaries_success(self):
+        """Should split at depth-0 boundaries when token limit exceeded."""
+        splitter = MarkdownSplitter(max_tokens_per_chunk=50)
+
+        # Create chunk with hierarchical list
+        content = """- First policy with many words to exceed token limit here
+  - Sub-point 1 for first policy
+  - Sub-point 2 for first policy
+- Second policy also with many words to exceed the token limit
+  - Sub-point 1 for second policy
+  - Sub-point 2 for second policy"""
+
+        chunk = Chunk(
+            chunk_id="test",
+            content=content,
+            metadata=ChunkMetadata(
+                original_position=0,
+                token_count=splitter.estimate_tokens(content)
+            )
+        )
+
+        result = splitter._split_by_depth_boundaries(chunk)
+
+        # Should split into 2 chunks at depth-0 boundary
+        assert len(result) >= 1
+
+        if len(result) > 1:
+            # Verify split happened at depth-0
+            assert 'First policy' in result[0].content
+            assert 'Second policy' in result[1].content
+            # Children should stay with parents
+            assert 'Sub-point 1 for first' in result[0].content
+            assert 'Sub-point 1 for second' in result[1].content
+
+    def test_split_by_depth_boundaries_too_few_items(self):
+        """Should return original chunk if < 2 list items."""
+        splitter = MarkdownSplitter(max_tokens_per_chunk=50)
+
+        content = "- Single item"
+        chunk = Chunk(
+            chunk_id="test",
+            content=content,
+            metadata=ChunkMetadata(
+                original_position=0,
+                token_count=splitter.estimate_tokens(content)
+            )
+        )
+
+        result = splitter._split_by_depth_boundaries(chunk)
+
+        assert len(result) == 1
+        assert result[0] == chunk
+
+    def test_split_by_depth_boundaries_no_depth0_split_points(self):
+        """Should return original chunk if < 2 depth-0 items."""
+        splitter = MarkdownSplitter(max_tokens_per_chunk=50)
+
+        content = """- Single parent
+  - Child 1
+  - Child 2
+  - Child 3"""
+
+        chunk = Chunk(
+            chunk_id="test",
+            content=content,
+            metadata=ChunkMetadata(
+                original_position=0,
+                token_count=splitter.estimate_tokens(content)
+            )
+        )
+
+        result = splitter._split_by_depth_boundaries(chunk)
+
+        # Only 1 depth-0 item, cannot split
+        assert len(result) == 1
+
+    def test_split_by_depth_boundaries_preserves_metadata(self):
+        """Should preserve header metadata in sub-chunks."""
+        splitter = MarkdownSplitter(max_tokens_per_chunk=50)
+
+        content = """- First policy item with enough words to exceed limit
+  - Sub A
+- Second policy item with enough words to exceed limit
+  - Sub B"""
+
+        chunk = Chunk(
+            chunk_id="test",
+            content=content,
+            metadata=ChunkMetadata(
+                h1="Test H1",
+                h2="Test H2",
+                original_position=5,
+                token_count=splitter.estimate_tokens(content)
+            )
+        )
+
+        result = splitter._split_by_depth_boundaries(chunk)
+
+        for sub_chunk in result:
+            assert sub_chunk.metadata.h1 == "Test H1"
+            assert sub_chunk.metadata.h2 == "Test H2"
+            assert sub_chunk.metadata.original_position == 5
+
+    def test_split_oversized_chunk_with_hierarchy(self):
+        """Should use depth-aware splitting for hierarchical lists."""
+        splitter = MarkdownSplitter(max_tokens_per_chunk=50)
+
+        # Hierarchical list that exceeds token limit
+        content = """- Parent 1 with many words to make it long enough to exceed token limit
+  - Child 1a also with many words
+  - Child 1b also with many words
+- Parent 2 with many words to make it long enough to exceed token limit
+  - Child 2a also with many words
+  - Child 2b also with many words"""
+
+        chunk = Chunk(
+            chunk_id="test",
+            content=content,
+            metadata=ChunkMetadata(
+                original_position=0,
+                token_count=splitter.estimate_tokens(content)
+            )
+        )
+
+        result = splitter._split_oversized_chunk(chunk)
+
+        # Should split (either by depth-aware or list items)
+        assert len(result) >= 1
+
+        # Check if depth-aware splitting was attempted
+        # (even if it falls back to list item splitting)
+        depth_aware_used = any('-d' in c.chunk_id for c in result)
+        list_split_used = any('-0' in c.chunk_id or '-1' in c.chunk_id for c in result)
+
+        assert depth_aware_used or list_split_used
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

@@ -1,8 +1,22 @@
 """Data models for markdown chunks and metadata."""
 
 from dataclasses import dataclass
+from enum import Enum
 
 import numpy as np
+
+
+class ElementType(str, Enum):
+    """Type of markdown element.
+
+    Used to classify chunks by their semantic role in the document.
+    """
+    TITLE = "title"
+    HEADER = "header"
+    NARRATIVE_TEXT = "narrative_text"
+    LIST_ITEM = "list_item"
+    CODE_SNIPPET = "code_snippet"
+    PROCEDURE_STEP = "procedure_step"  # Special: detected from "Stage N", "Step N", etc.
 
 
 @dataclass
@@ -18,6 +32,11 @@ class ChunkMetadata:
         h6: Level 6 header (###### Title) if present
         original_position: Position in original document (0-indexed)
         token_count: Estimated token count for this chunk
+        parent_id: Parent element ID from unstructured.io (for hierarchical tracking)
+        depth_level: Depth level from unstructured.io (0=h1, 1=h2, etc.)
+        sequence_number: Detected step number (Stage N, Step N, Phase N)
+        is_inside_code_block: Flag indicating if content is code
+        element_type: Type of element (TITLE, NARRATIVE_TEXT, etc.)
     """
 
     h1: str | None = None
@@ -28,6 +47,11 @@ class ChunkMetadata:
     h6: str | None = None
     original_position: int = 0
     token_count: int = 0
+    parent_id: str | None = None
+    depth_level: int = 0
+    sequence_number: int | None = None
+    is_inside_code_block: bool = False
+    element_type: ElementType | None = None
 
     def __post_init__(self) -> None:
         """Validate metadata after initialization."""
@@ -50,7 +74,7 @@ class ChunkMetadata:
         headers = [h for h in [self.h1, self.h2, self.h3, self.h4, self.h5, self.h6] if h is not None]
         return " > ".join(headers) if headers else ""
 
-    def to_dict(self) -> dict[str, str | int | None]:
+    def to_dict(self) -> dict[str, str | int | bool | None]:
         """Convert to dictionary for serialization."""
         return {
             "h1": self.h1,
@@ -61,10 +85,15 @@ class ChunkMetadata:
             "h6": self.h6,
             "original_position": self.original_position,
             "token_count": self.token_count,
+            "parent_id": self.parent_id,
+            "depth_level": self.depth_level,
+            "sequence_number": self.sequence_number,
+            "is_inside_code_block": self.is_inside_code_block,
+            "element_type": self.element_type.value if self.element_type else None,
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, str | int | None]) -> "ChunkMetadata":
+    def from_dict(cls, data: dict[str, str | int | bool | None]) -> "ChunkMetadata":
         """Create from dictionary."""
         # Extract values with proper type checking
         h1_val = data.get("h1")
@@ -75,6 +104,16 @@ class ChunkMetadata:
         h6_val = data.get("h6")
         pos_val = data.get("original_position")
         tok_val = data.get("token_count")
+        parent_val = data.get("parent_id")
+        depth_val = data.get("depth_level")
+        seq_val = data.get("sequence_number")
+        code_val = data.get("is_inside_code_block")
+        elem_type_val = data.get("element_type")
+
+        # Convert element_type string back to enum
+        element_type = None
+        if elem_type_val is not None:
+            element_type = ElementType(elem_type_val)
 
         return cls(
             h1=h1_val if isinstance(h1_val, str) else None,
@@ -85,6 +124,11 @@ class ChunkMetadata:
             h6=h6_val if isinstance(h6_val, str) else None,
             original_position=int(pos_val) if pos_val is not None else 0,
             token_count=int(tok_val) if tok_val is not None else 0,
+            parent_id=parent_val if isinstance(parent_val, str) else None,
+            depth_level=int(depth_val) if depth_val is not None else 0,
+            sequence_number=int(seq_val) if seq_val is not None else None,
+            is_inside_code_block=bool(code_val) if code_val is not None else False,
+            element_type=element_type,
         )
 
 
