@@ -124,7 +124,7 @@ jobs:
           echo "Generated changelog from ${PREVIOUS_TAG:-initial} to ${GITHUB_REF_NAME}"
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: dist/*
           body_path: changelog.txt
