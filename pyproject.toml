@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=82.0.1", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -32,15 +32,15 @@ classifiers = [
 ]
 
 dependencies = [
-    "langchain-text-splitters>=0.2.0",
-    "numpy>=1.24.0,<1.25.0", # NumPy 1.x for better compatibility
-    "scikit-learn>=1.3.0",
-    "ollama>=0.1.0",
-    "typer[all]>=0.18.0", # >=0.18.0 required for click 8.3.0 compatibility
-    "rich>=13.0.0",
-    "pyyaml>=6.0",
-    "unstructured>=0.18.15",
-    "markdown>=3.9",
+    "langchain-text-splitters>=1.1.1",
+    "numpy>=2.2.6,<2.3.0", # NumPy 1.x for better compatibility
+    "scikit-learn>=1.7.2",
+    "ollama>=0.6.1",
+    "typer[all]>=0.24.1", # >=0.18.0 required for click 8.3.0 compatibility
+    "rich>=15.0.0",
+    "pyyaml>=6.0.3",
+    "unstructured>=0.18.32",
+    "markdown>=3.10.2",
 ]
 
 [project.optional-dependencies]
@@ -51,19 +51,19 @@ dev = [
     "ruff>=0.1.0",
     "mypy>=1.7.0",
     "types-PyYAML",
-    "py-spy>=0.3.14",
+    "py-spy>=0.4.1",
     "memory-profiler>=0.61.0",
-    "psutil>=5.9.0",
-    "pre-commit>=3.5.0",
+    "psutil>=7.2.2",
+    "pre-commit>=4.5.1",
 ]
 docs = [
-    "mkdocs>=1.5.0",
-    "mkdocs-material>=9.5.0",
-    "mkdocstrings[python]>=0.24.0",
-    "mkdocs-section-index>=0.3.0",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.7.6",
+    "mkdocstrings[python]>=1.0.3",
+    "mkdocs-section-index>=0.3.11",
 ]
 optimization = [
-    "numba>=0.58.0",
+    "numba>=0.65.0",
 ]
 
 [project.scripts]
